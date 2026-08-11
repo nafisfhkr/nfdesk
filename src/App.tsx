@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Sparkles, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain } from 'lucide-react';
+import { X, Minus, Sparkles, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTimer, formatTime } from './hooks/useTimer';
+import TasksView from './components/TasksView';
+import NoteView from './components/NoteView';
 
 function App() {
   const [time, setTime] = useState<string>('');
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
   const [task, setTask] = useState('');
+  const [activeTab, setActiveTab] = useState<'TIMER' | 'TASKS' | 'NOTE'>('TIMER');
 
   const { mode, status, remaining, start, pause, resume, reset, switchMode } = useTimer();
   const isRunning = status === 'RUNNING';
@@ -110,160 +114,226 @@ function App() {
         </div>
 
         {/* App Content Body */}
-        <div className="flex-1 p-4 flex flex-col justify-between z-10 overflow-y-auto">
-
-          {/* Top Info Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-rose-400 animate-ping' : 'bg-emerald-400'}`} />
-              <span>{isRunning ? 'Focusing' : status === 'PAUSED' ? 'Paused' : 'Ready'}</span>
-            </div>
-            <div className="flex items-center gap-1 text-[11px] font-mono text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
-              <span>{time || '--:--:--'}</span>
-            </div>
-          </div>
-
-          {/* Mode Toggle */}
-          <div className="flex items-center justify-center">
-            <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
-              <button
-                onClick={() => switchMode('FOCUS')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                  mode === 'FOCUS'
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+        <div className="flex-1 p-4 flex flex-col justify-between z-10 overflow-hidden relative">
+          
+          <AnimatePresence mode="wait">
+            {activeTab === 'TIMER' && (
+              <motion.div
+                key="timer"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar pr-1"
               >
-                <Brain className="w-3.5 h-3.5" />
-                Focus
-                <span className="opacity-70 text-[10px]">25m</span>
-              </button>
-              <button
-                onClick={() => switchMode('BREAK')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                  mode === 'BREAK'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/25'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Coffee className="w-3.5 h-3.5" />
-                Break
-                <span className="opacity-70 text-[10px]">5m</span>
-              </button>
-            </div>
-          </div>
+                {/* Top Info Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-rose-400 animate-ping' : 'bg-emerald-400'}`} />
+                    <span>{isRunning ? 'Focusing' : status === 'PAUSED' ? 'Paused' : 'Ready'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                    <span>{time || '--:--:--'}</span>
+                  </div>
+                </div>
 
-          {/* Current Task Input */}
-          <div className="relative">
-            <input
-              type="text"
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              placeholder={isRunning ? task || 'Focusing…' : "What are you focusing on?"}
-              readOnly={isRunning}
-              disabled={isRunning}
-              className={`w-full text-center text-sm py-2.5 bg-transparent outline-none border-b transition-all duration-300 placeholder:text-slate-500 ${
-                isRunning
-                  ? 'text-slate-200 font-semibold border-indigo-500/40 focus:border-indigo-400'
-                  : 'text-slate-100 border-white/10 hover:border-white/20 focus:border-indigo-400 focus:glow-indigo'
+                {/* Mode Toggle */}
+                <div className="flex items-center justify-center mt-2">
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+                    <button
+                      onClick={() => switchMode('FOCUS')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                        mode === 'FOCUS'
+                          ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Brain className="w-3.5 h-3.5" />
+                      Focus
+                      <span className="opacity-70 text-[10px]">25m</span>
+                    </button>
+                    <button
+                      onClick={() => switchMode('BREAK')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                        mode === 'BREAK'
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/25'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Coffee className="w-3.5 h-3.5" />
+                      Break
+                      <span className="opacity-70 text-[10px]">5m</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Current Task Input */}
+                <div className="relative mt-2">
+                  <input
+                    type="text"
+                    value={task}
+                    onChange={(e) => setTask(e.target.value)}
+                    placeholder={isRunning ? task || 'Focusing…' : "What are you focusing on?"}
+                    readOnly={isRunning}
+                    disabled={isRunning}
+                    className={`w-full text-center text-sm py-2.5 bg-transparent outline-none border-b transition-all duration-300 placeholder:text-slate-500 ${
+                      isRunning
+                        ? 'text-slate-200 font-semibold border-indigo-500/40 focus:border-indigo-400'
+                        : 'text-slate-100 border-white/10 hover:border-white/20 focus:border-indigo-400 focus:glow-indigo'
+                    }`}
+                  />
+                </div>
+
+                {/* Timer Display */}
+                <div className="my-auto py-4 flex flex-col items-center justify-center">
+                  <div className={`relative flex items-center justify-center ${
+                    isRunning ? 'animate-glow-pulse' : ''
+                  }`}>
+                    {/* Circular Progress Ring */}
+                    <svg className="absolute w-52 h-52 -rotate-90" viewBox="0 0 200 200">
+                      <defs>
+                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor={mode === 'BREAK' ? '#34d399' : '#6366f1'} />
+                          <stop offset="100%" stopColor={mode === 'BREAK' ? '#2dd4bf' : '#8b5cf6'} />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                      <circle
+                        cx="100" cy="100" r="88" fill="none"
+                        stroke="url(#ringGrad)" strokeWidth="6" strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 88}
+                        strokeDashoffset={2 * Math.PI * 88 * (1 - remaining / (mode === 'BREAK' ? 5 * 60 * 1000 : 25 * 60 * 1000))}
+                        className="transition-[stroke-dashoffset] duration-300 ease-linear"
+                      />
+                    </svg>
+
+                    <div className="w-44 h-44 rounded-full flex flex-col items-center justify-center glass-card">
+                      <span className={`font-bold tabular-nums tracking-tight ${isRunning ? 'animate-pulse-subtle' : ''}`}
+                            style={{ fontSize: remaining >= 10 * 60 * 1000 ? '3.4rem' : '3.1rem' }}>
+                        {formatTime(remaining)}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-1">
+                        {mode === 'BREAK' ? 'Break' : 'Focus'} session
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="flex items-center gap-3 mt-6">
+                    {status === 'IDLE' && (
+                      <button
+                        onClick={start}
+                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        Start Focus
+                      </button>
+                    )}
+
+                    {isRunning && (
+                      <button
+                        onClick={pause}
+                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white/10 text-slate-100 text-sm font-bold border border-white/10 hover:bg-white/15 active:scale-95 transition-all duration-200"
+                      >
+                        <Pause className="w-4 h-4 fill-current" />
+                        Pause
+                      </button>
+                    )}
+
+                    {status === 'PAUSED' && (
+                      <>
+                        <button
+                          onClick={resume}
+                          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
+                        >
+                          <Play className="w-4 h-4 fill-current" />
+                          Resume
+                        </button>
+                        <button
+                          onClick={reset}
+                          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 text-slate-400 text-sm font-bold border border-white/10 hover:text-rose-400 hover:border-rose-500/30 active:scale-95 transition-all duration-200"
+                        >
+                          <Square className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+
+                    {(status === 'COMPLETED') && (
+                      <button
+                        onClick={reset}
+                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Restart
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'TASKS' && (
+              <motion.div
+                key="tasks"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 w-full h-full"
+              >
+                <TasksView />
+              </motion.div>
+            )}
+
+            {activeTab === 'NOTE' && (
+              <motion.div
+                key="note"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 w-full h-full"
+              >
+                <NoteView />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bottom Navigation Bar */}
+          <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-around">
+            <button
+              onClick={() => setActiveTab('TIMER')}
+              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+                activeTab === 'TIMER'
+                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
               }`}
-            />
-          </div>
-
-          {/* Timer Display */}
-          <div className="my-auto py-4 flex flex-col items-center justify-center">
-            <div className={`relative flex items-center justify-center ${
-              isRunning ? 'animate-glow-pulse' : ''
-            }`}>
-              {/* Circular Progress Ring */}
-              <svg className="absolute w-52 h-52 -rotate-90" viewBox="0 0 200 200">
-                <defs>
-                  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor={mode === 'BREAK' ? '#34d399' : '#6366f1'} />
-                    <stop offset="100%" stopColor={mode === 'BREAK' ? '#2dd4bf' : '#8b5cf6'} />
-                  </linearGradient>
-                </defs>
-                <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-                <circle
-                  cx="100" cy="100" r="88" fill="none"
-                  stroke="url(#ringGrad)" strokeWidth="6" strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 88}
-                  strokeDashoffset={2 * Math.PI * 88 * (1 - remaining / (mode === 'BREAK' ? 5 * 60 * 1000 : 25 * 60 * 1000))}
-                  className="transition-[stroke-dashoffset] duration-300 ease-linear"
-                />
-              </svg>
-
-              <div className="w-44 h-44 rounded-full flex flex-col items-center justify-center glass-card">
-                <span className={`font-bold tabular-nums tracking-tight ${isRunning ? 'animate-pulse-subtle' : ''}`}
-                      style={{ fontSize: remaining >= 10 * 60 * 1000 ? '3.4rem' : '3.1rem' }}>
-                  {formatTime(remaining)}
-                </span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-1">
-                  {mode === 'BREAK' ? 'Break' : 'Focus'} session
-                </span>
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-3 mt-6">
-              {status === 'IDLE' && (
-                <button
-                  onClick={start}
-                  className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  Start Focus
-                </button>
-              )}
-
-              {isRunning && (
-                <button
-                  onClick={pause}
-                  className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white/10 text-slate-100 text-sm font-bold border border-white/10 hover:bg-white/15 active:scale-95 transition-all duration-200"
-                >
-                  <Pause className="w-4 h-4 fill-current" />
-                  Pause
-                </button>
-              )}
-
-              {status === 'PAUSED' && (
-                <>
-                  <button
-                    onClick={resume}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    Resume
-                  </button>
-                  <button
-                    onClick={reset}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 text-slate-400 text-sm font-bold border border-white/10 hover:text-rose-400 hover:border-rose-500/30 active:scale-95 transition-all duration-200"
-                  >
-                    <Square className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              )}
-
-              {(status === 'COMPLETED') && (
-                <button
-                  onClick={reset}
-                  className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Restart
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Footer Bar */}
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
-            <span>NFDesk Floating Widget</span>
-            <span className="font-mono text-slate-400">350 x 500 px</span>
+            >
+              <Clock className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setActiveTab('TASKS')}
+              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+                activeTab === 'TASKS'
+                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <CheckSquare className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setActiveTab('NOTE')}
+              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+                activeTab === 'NOTE'
+                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+              }`}
+            >
+              <Edit3 className="w-5 h-5" />
+            </button>
           </div>
 
         </div>
-
       </div>
     </div>
   );
