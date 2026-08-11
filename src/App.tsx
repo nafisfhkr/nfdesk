@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Sparkles, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3 } from 'lucide-react';
+import { X, Minus, Sparkles, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTimer, formatTime } from './hooks/useTimer';
+import { getVaultPath, setVaultPath, appendToMarkdown, timeStamp } from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
 
@@ -10,9 +11,13 @@ function App() {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
   const [task, setTask] = useState('');
   const [activeTab, setActiveTab] = useState<'TIMER' | 'TASKS' | 'NOTE'>('TIMER');
+  const [showSettings, setShowSettings] = useState(false);
+  const [vaultPath, setVaultPathState] = useState(getVaultPath());
+  const [logStatus, setLogStatus] = useState<'IDLE' | 'SAVING' | 'DONE' | 'ERROR'>('IDLE');
 
-  const { mode, status, remaining, start, pause, resume, reset, switchMode } = useTimer();
+  const { mode, status, remaining, start, pause, resume, reset, switchMode, startedAt } = useTimer();
   const isRunning = status === 'RUNNING';
+  const isFocusCompleted = status === 'COMPLETED' && mode === 'FOCUS';
 
   useEffect(() => {
     const updateTime = () => {
@@ -41,6 +46,24 @@ function App() {
       console.log('Window minimize called (Browser mode fallback)');
     }
   };
+
+  const saveFocusLog = async () => {
+    setLogStatus('SAVING');
+    try {
+      const end = new Date();
+      const start = startedAt ? new Date(startedAt) : end;
+      await appendToMarkdown(`- **${timeStamp(start)}–${timeStamp(end)}** — ${task || 'Focus session'}`);
+      setLogStatus('DONE');
+    } catch (e) {
+      console.error(e);
+      setLogStatus('ERROR');
+    }
+  };
+
+  // Reset the log button state whenever the session is restarted or mode switches
+  useEffect(() => {
+    setLogStatus('IDLE');
+  }, [status, mode]);
 
   const toggleAlwaysOnTop = async () => {
     try {
@@ -93,6 +116,14 @@ function App() {
               }`}
             >
               <Pin className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+              className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all duration-200"
+            >
+              <Settings className="w-3.5 h-3.5" />
             </button>
 
             <button
@@ -258,7 +289,23 @@ function App() {
                       </>
                     )}
 
-                    {(status === 'COMPLETED') && (
+                    {isFocusCompleted && (
+                      <button
+                        onClick={saveFocusLog}
+                        disabled={logStatus === 'SAVING'}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border transition-all duration-200 ${
+                          logStatus === 'DONE'
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : logStatus === 'ERROR'
+                            ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                            : 'bg-white/10 text-slate-100 border-white/10 hover:bg-white/15 active:scale-95'
+                        }`}
+                      >
+                        {logStatus === 'DONE' ? '✓ Logged!' : logStatus === 'ERROR' ? 'Error!' : '💾 Save Log to Obsidian'}
+                      </button>
+                    )}
+
+                    {status === 'COMPLETED' && (
                       <button
                         onClick={reset}
                         className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
@@ -335,6 +382,70 @@ function App() {
 
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowSettings(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-panel w-full max-w-sm rounded-2xl border border-white/10 p-5 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-indigo-400" />
+                  Settings
+                </h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                Obsidian Vault Path
+              </label>
+              <input
+                type="text"
+                value={vaultPath}
+                onChange={(e) => setVaultPathState(e.target.value)}
+                placeholder="C:\Users\Nafis\Documents\Obsidian"
+                className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+              />
+
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 border border-white/10 hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setVaultPath(vaultPath);
+                    setShowSettings(false);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

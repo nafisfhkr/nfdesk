@@ -78,5 +78,5 @@ export function useTimer() {
     setStatus('IDLE');
   }, []);
 
-  return { mode, status, remaining, start, pause, resume, reset, switchMode };
+  return { mode, status, remaining, start, pause, resume, reset, switchMode, startedAt: startedAtRef.current };
 }
