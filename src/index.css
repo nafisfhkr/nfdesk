@@ -44,3 +44,9 @@
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.1);
 }
+
+@layer utilities {
+  .glow-indigo {
+    box-shadow: 0 4px 30px rgba(99, 102, 241, 0.35);
+  }
+}
