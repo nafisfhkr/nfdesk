@@ -1,1 +1,18 @@
-Docs/
+# Environment variables & secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# Build outputs & binaries
+dist/
+target/
+*.exe
+
+# Dependencies
+node_modules/
+
+# Logs & temp
+*.log
+.DS_Store
