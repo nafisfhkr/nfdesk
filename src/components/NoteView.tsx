@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, Check } from 'lucide-react';
+import { Save, Check, AlertTriangle } from 'lucide-react';
+import { appendToMarkdown, timeStamp } from '../lib/markdown';
+
+type ToastState = { kind: 'success' | 'error'; msg: string } | null;
 
 export default function NoteView() {
   const [note, setNote] = useState('');
-  const [showToast, setShowToast] = useState(false);
+  const [toast, setToast] = useState<ToastState>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -14,20 +17,22 @@ export default function NoteView() {
     }
   }, []);
 
-  const saveNote = () => {
-    if (note.trim() === '') return;
-    
-    // TODO: Phase 2 - connect to Rust backend file-writing logic
-    console.log("Saving note:", note);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(id);
+  }, [toast]);
 
-    // Show toast and clear
-    setNote('');
-    setShowToast(true);
-    
-    // Hide toast after 2 seconds
-    setTimeout(() => {
-      setShowToast(false);
-    }, 2000);
+  const saveNote = async () => {
+    if (note.trim() === '') return;
+    try {
+      await appendToMarkdown(`- **${timeStamp()}** — ${note.trim()}`);
+      setNote('');
+      setToast({ kind: 'success', msg: 'Note saved!' });
+    } catch (e) {
+      console.error(e);
+      setToast({ kind: 'error', msg: e instanceof Error ? e.message : 'Failed to save note' });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -47,19 +52,28 @@ export default function NoteView() {
         className="flex-1 w-full bg-transparent resize-none outline-none text-sm text-slate-200 placeholder:text-slate-500 custom-scrollbar p-1"
         style={{ scrollbarWidth: 'thin' }}
       />
-      
+
       {/* Toast Notification */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none z-10">
         <AnimatePresence>
-          {showToast && (
+          {toast && (
             <motion.div
+              key={toast.msg}
               initial={{ opacity: 0, y: -20, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.9 }}
-              className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 backdrop-blur-md shadow-lg"
+              className={`px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 backdrop-blur-md shadow-lg ${
+                toast.kind === 'success'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+              }`}
             >
-              <Check className="w-3.5 h-3.5" />
-              Note saved!
+              {toast.kind === 'success' ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5" />
+              )}
+              {toast.msg}
             </motion.div>
           )}
         </AnimatePresence>
