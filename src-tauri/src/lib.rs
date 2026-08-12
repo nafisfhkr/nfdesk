@@ -7,6 +7,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 /// Appends `content` (plus a trailing newline) to `<vault_path>/<filename>`.
@@ -37,6 +38,11 @@ fn append_to_markdown(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
         .setup(|app| {
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show NFDesk", true, None::<&str>)?;
