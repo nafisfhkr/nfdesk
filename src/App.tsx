@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Minus, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTimer, formatTime } from './hooks/useTimer';
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
+import { useTimer, formatTime, getDurationMin, getDurationMs, DURATION_KEYS } from './hooks/useTimer';
 import { getVaultPath, setVaultPath, appendToMarkdown, timeStamp } from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
-import Mascot, { MascotStatus } from './components/Mascot';
 
 function App() {
   const [time, setTime] = useState<string>('');
@@ -15,16 +15,34 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [vaultPath, setVaultPathState] = useState(getVaultPath());
   const [logStatus, setLogStatus] = useState<'IDLE' | 'SAVING' | 'DONE' | 'ERROR'>('IDLE');
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false);
+  const [focusMinutes, setFocusMinutes] = useState(() => getDurationMin('FOCUS'));
+  const [breakMinutes, setBreakMinutes] = useState(() => getDurationMin('BREAK'));
 
   const { mode, status, remaining, start, pause, resume, reset, switchMode, startedAt } = useTimer();
   const isRunning = status === 'RUNNING';
   const isFocusCompleted = status === 'COMPLETED' && mode === 'FOCUS';
 
-  const getMascotStatus = (): MascotStatus => {
-    if (status === 'COMPLETED') return 'SUCCESS';
-    if (mode === 'BREAK') return 'BREAK';
-    if (status === 'RUNNING') return 'FOCUS';
-    return 'IDLE';
+  useEffect(() => {
+    isEnabled().then(setAutoStartEnabled).catch(() => setAutoStartEnabled(false));
+  }, []);
+
+  const toggleAutoStart = async () => {
+    if (autoStartEnabled) {
+      await disable();
+      setAutoStartEnabled(false);
+    } else {
+      await enable();
+      setAutoStartEnabled(true);
+    }
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem(DURATION_KEYS.FOCUS, focusMinutes.toString());
+    localStorage.setItem(DURATION_KEYS.BREAK, breakMinutes.toString());
+    setVaultPath(vaultPath);
+    reset();
+    setShowSettings(false);
   };
 
   useEffect(() => {
@@ -186,7 +204,7 @@ function App() {
                     >
                       <Brain className="w-3.5 h-3.5" />
                       Focus
-                      <span className="opacity-70 text-[10px]">25m</span>
+                      <span className="opacity-70 text-[10px]">{getDurationMin('FOCUS')}m</span>
                     </button>
                     <button
                       onClick={() => switchMode('BREAK')}
@@ -198,7 +216,7 @@ function App() {
                     >
                       <Coffee className="w-3.5 h-3.5" />
                       Break
-                      <span className="opacity-70 text-[10px]">5m</span>
+                      <span className="opacity-70 text-[10px]">{getDurationMin('BREAK')}m</span>
                     </button>
                   </div>
                 </div>
@@ -238,7 +256,7 @@ function App() {
                         cx="100" cy="100" r="88" fill="none"
                         stroke="url(#ringGrad)" strokeWidth="6" strokeLinecap="round"
                         strokeDasharray={2 * Math.PI * 88}
-                        strokeDashoffset={2 * Math.PI * 88 * (1 - remaining / (mode === 'BREAK' ? 5 * 60 * 1000 : 25 * 60 * 1000))}
+                        strokeDashoffset={2 * Math.PI * 88 * (1 - remaining / getDurationMs(mode))}
                         className="transition-[stroke-dashoffset] duration-300 ease-linear"
                       />
                     </svg>
@@ -430,6 +448,56 @@ function App() {
                 className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
               />
 
+              <div className="flex gap-3 mt-4">
+                <div className="flex-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                    Focus (min)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={focusMinutes}
+                    onChange={(e) => setFocusMinutes(Number(e.target.value))}
+                    placeholder="25"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                    Break (min)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={breakMinutes}
+                    onChange={(e) => setBreakMinutes(Number(e.target.value))}
+                    placeholder="5"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={toggleAutoStart}
+                className="flex items-center justify-between w-full mt-4 py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+              >
+                <span className="flex items-center gap-2 text-sm text-slate-200">
+                  <span className={`w-2 h-2 rounded-full ${autoStartEnabled ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                  Launch at startup
+                </span>
+                <span
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                    autoStartEnabled ? 'bg-indigo-500' : 'bg-white/15'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
+                      autoStartEnabled ? 'left-[18px]' : 'left-0.5'
+                    }`}
+                  />
+                </span>
+              </button>
+
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={() => setShowSettings(false)}
@@ -438,10 +506,7 @@ function App() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    setVaultPath(vaultPath);
-                    setShowSettings(false);
-                  }}
+                  onClick={saveSettings}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
                 >
                   Save

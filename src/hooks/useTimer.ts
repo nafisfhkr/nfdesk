@@ -3,10 +3,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export type TimerMode = 'FOCUS' | 'BREAK';
 export type TimerStatus = 'IDLE' | 'RUNNING' | 'PAUSED' | 'COMPLETED';
 
-export const DURATIONS: Record<TimerMode, number> = {
-  FOCUS: 25 * 60 * 1000,
-  BREAK: 5 * 60 * 1000,
+export const DURATION_KEYS = {
+  FOCUS: 'nfdesk-focus-time',
+  BREAK: 'nfdesk-break-time',
+} as const;
+
+export const DEFAULT_DURATION_MIN: Record<TimerMode, number> = {
+  FOCUS: 25,
+  BREAK: 5,
 };
+
+export function getDurationMin(mode: TimerMode): number {
+  const raw = localStorage.getItem(DURATION_KEYS[mode]);
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_DURATION_MIN[mode];
+}
+
+export function getDurationMs(mode: TimerMode): number {
+  return getDurationMin(mode) * 60 * 1000;
+}
 
 export function formatTime(ms: number): string {
   const totalSec = Math.max(0, Math.ceil(ms / 1000));
@@ -22,10 +37,10 @@ export function formatTime(ms: number): string {
 export function useTimer() {
   const [mode, setMode] = useState<TimerMode>('FOCUS');
   const [status, setStatus] = useState<TimerStatus>('IDLE');
-  const [remaining, setRemaining] = useState(DURATIONS.FOCUS);
+  const [remaining, setRemaining] = useState(() => getDurationMs('FOCUS'));
 
   // remaining at the moment of the last start/resume
-  const baseRef = useRef(DURATIONS.FOCUS);
+  const baseRef = useRef(getDurationMs('FOCUS'));
   const startedAtRef = useRef(0);
 
   useEffect(() => {
@@ -45,9 +60,10 @@ export function useTimer() {
   }, [status]);
 
   const start = useCallback(() => {
-    baseRef.current = DURATIONS[mode];
+    const duration = getDurationMs(mode);
+    baseRef.current = duration;
     startedAtRef.current = Date.now();
-    setRemaining(DURATIONS[mode]);
+    setRemaining(duration);
     setStatus('RUNNING');
   }, [mode]);
 
@@ -66,15 +82,17 @@ export function useTimer() {
   }, [status, remaining]);
 
   const reset = useCallback(() => {
-    baseRef.current = DURATIONS[mode];
-    setRemaining(DURATIONS[mode]);
+    const duration = getDurationMs(mode);
+    baseRef.current = duration;
+    setRemaining(duration);
     setStatus('IDLE');
   }, [mode]);
 
   const switchMode = useCallback((m: TimerMode) => {
+    const duration = getDurationMs(m);
     setMode(m);
-    baseRef.current = DURATIONS[m];
-    setRemaining(DURATIONS[m]);
+    baseRef.current = duration;
+    setRemaining(duration);
     setStatus('IDLE');
   }, []);
 
