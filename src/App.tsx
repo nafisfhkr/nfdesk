@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Sparkles, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3, Settings } from 'lucide-react';
+import { X, Minus, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTimer, formatTime } from './hooks/useTimer';
 import { getVaultPath, setVaultPath, appendToMarkdown, timeStamp } from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
+import Mascot, { MascotStatus } from './components/Mascot';
 
 function App() {
   const [time, setTime] = useState<string>('');
@@ -18,6 +19,13 @@ function App() {
   const { mode, status, remaining, start, pause, resume, reset, switchMode, startedAt } = useTimer();
   const isRunning = status === 'RUNNING';
   const isFocusCompleted = status === 'COMPLETED' && mode === 'FOCUS';
+
+  const getMascotStatus = (): MascotStatus => {
+    if (status === 'COMPLETED') return 'SUCCESS';
+    if (mode === 'BREAK') return 'BREAK';
+    if (status === 'RUNNING') return 'FOCUS';
+    return 'IDLE';
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -93,9 +101,6 @@ function App() {
         >
           {/* Brand & App Name */}
           <div className="flex items-center gap-2 pointer-events-none">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-md shadow-indigo-500/20">
-              <Sparkles className="w-3.5 h-3.5 text-white" />
-            </div>
             <span className="text-xs font-bold tracking-wide text-slate-100 drop-shadow-sm">
               NFDesk
             </span>
