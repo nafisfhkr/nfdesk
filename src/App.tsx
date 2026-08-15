@@ -3,7 +3,16 @@ import { X, Minus, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, Ch
 import { motion, AnimatePresence } from 'framer-motion';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useTimer, formatTime, getDurationMin, getDurationMs, DURATION_KEYS } from './hooks/useTimer';
-import { getVaultPath, setVaultPath, appendToMarkdown, timeStamp } from './lib/markdown';
+import {
+  getVaultPath,
+  setVaultPath,
+  appendDailyNote,
+  getDailyNotesFolder,
+  setDailyNotesFolder,
+  getTasksFolder,
+  setTasksFolder,
+  timeStamp,
+} from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
 
@@ -14,6 +23,8 @@ function App() {
   const [activeTab, setActiveTab] = useState<'TIMER' | 'TASKS' | 'NOTE'>('TIMER');
   const [showSettings, setShowSettings] = useState(false);
   const [vaultPath, setVaultPathState] = useState(getVaultPath());
+  const [dailyNotesFolder, setDailyNotesFolderState] = useState(getDailyNotesFolder());
+  const [tasksFolder, setTasksFolderState] = useState(getTasksFolder());
   const [logStatus, setLogStatus] = useState<'IDLE' | 'SAVING' | 'DONE' | 'ERROR'>('IDLE');
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [focusMinutes, setFocusMinutes] = useState(() => getDurationMin('FOCUS'));
@@ -41,6 +52,8 @@ function App() {
     localStorage.setItem(DURATION_KEYS.FOCUS, focusMinutes.toString());
     localStorage.setItem(DURATION_KEYS.BREAK, breakMinutes.toString());
     setVaultPath(vaultPath);
+    setDailyNotesFolder(dailyNotesFolder);
+    setTasksFolder(tasksFolder);
     reset();
     setShowSettings(false);
   };
@@ -78,7 +91,7 @@ function App() {
     try {
       const end = new Date();
       const start = startedAt ? new Date(startedAt) : end;
-      await appendToMarkdown(`- **${timeStamp(start)}–${timeStamp(end)}** — ${task || 'Focus session'}`);
+      await appendDailyNote(`- **${timeStamp(start)}–${timeStamp(end)}** — ${task || 'Focus session'}`);
       setLogStatus('DONE');
     } catch (e) {
       console.error(e);
@@ -447,6 +460,33 @@ function App() {
                 placeholder="C:\Users\Nafis\Documents\Obsidian"
                 className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
               />
+
+              <div className="flex gap-3 mt-4">
+                <div className="flex-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                    Daily Notes Subfolder
+                  </label>
+                  <input
+                    type="text"
+                    value={dailyNotesFolder}
+                    onChange={(e) => setDailyNotesFolderState(e.target.value)}
+                    placeholder="Daily Notes"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                    Tasks Subfolder
+                  </label>
+                  <input
+                    type="text"
+                    value={tasksFolder}
+                    onChange={(e) => setTasksFolderState(e.target.value)}
+                    placeholder="Tasks"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                  />
+                </div>
+              </div>
 
               <div className="flex gap-3 mt-4">
                 <div className="flex-1">
