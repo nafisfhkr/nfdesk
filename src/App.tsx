@@ -38,6 +38,35 @@ function App() {
     isEnabled().then(setAutoStartEnabled).catch(() => setAutoStartEnabled(false));
   }, []);
 
+  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSettings) {
+          e.preventDefault();
+          setShowSettings(false);
+        }
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable;
+
+      if (e.key === ' ' && !isTyping && activeTab === 'TIMER') {
+        e.preventDefault();
+        if (status === 'IDLE') start();
+        else if (status === 'RUNNING') pause();
+        else if (status === 'PAUSED') resume();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSettings, activeTab, status, start, pause, resume]);
+
   const toggleAutoStart = async () => {
     if (autoStartEnabled) {
       await disable();
@@ -454,6 +483,7 @@ function App() {
                 Obsidian Vault Path
               </label>
               <input
+                autoFocus
                 type="text"
                 value={vaultPath}
                 onChange={(e) => setVaultPathState(e.target.value)}
@@ -461,10 +491,10 @@ function App() {
                 className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
               />
 
-              <div className="flex gap-3 mt-4">
-                <div className="flex-1">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
-                    Daily Notes Subfolder
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="min-w-0">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate" title="Daily Notes Subfolder">
+                    Daily Notes
                   </label>
                   <input
                     type="text"
@@ -474,9 +504,9 @@ function App() {
                     className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
-                    Tasks Subfolder
+                <div className="min-w-0">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate" title="Tasks Subfolder">
+                    Tasks Folder
                   </label>
                   <input
                     type="text"
@@ -488,9 +518,9 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-4">
-                <div className="flex-1">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="min-w-0">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate">
                     Focus (min)
                   </label>
                   <input
@@ -502,8 +532,8 @@ function App() {
                     className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
+                <div className="min-w-0">
+                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate">
                     Break (min)
                   </label>
                   <input
