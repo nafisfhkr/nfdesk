@@ -38,6 +38,35 @@ function App() {
     isEnabled().then(setAutoStartEnabled).catch(() => setAutoStartEnabled(false));
   }, []);
 
+  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSettings) {
+          e.preventDefault();
+          setShowSettings(false);
+        }
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable;
+
+      if (e.key === ' ' && !isTyping && activeTab === 'TIMER') {
+        e.preventDefault();
+        if (status === 'IDLE') start();
+        else if (status === 'RUNNING') pause();
+        else if (status === 'PAUSED') resume();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSettings, activeTab, status, start, pause, resume]);
+
   const toggleAutoStart = async () => {
     if (autoStartEnabled) {
       await disable();
@@ -454,6 +483,7 @@ function App() {
                 Obsidian Vault Path
               </label>
               <input
+                autoFocus
                 type="text"
                 value={vaultPath}
                 onChange={(e) => setVaultPathState(e.target.value)}
