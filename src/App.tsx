@@ -15,6 +15,7 @@ import {
 } from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
+import { notifyTimerCompletion } from './lib/notifications';
 
 function App() {
   const [time, setTime] = useState<string>('');
@@ -131,6 +132,13 @@ function App() {
   // Reset the log button state whenever the session is restarted or mode switches
   useEffect(() => {
     setLogStatus('IDLE');
+  }, [status, mode]);
+
+  // Trigger audio chime & Windows notification when timer reaches 00:00
+  useEffect(() => {
+    if (status === 'COMPLETED') {
+      notifyTimerCompletion(mode, task);
+    }
   }, [status, mode]);
 
   const toggleAlwaysOnTop = async () => {
