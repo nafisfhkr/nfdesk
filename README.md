@@ -21,6 +21,24 @@ Instead of switching back and forth between full-sized productivity apps, NFDesk
 
 ---
 
+## 📥 Download & Quick Install
+
+Get the latest release for **Windows 10 / 11** (64-bit):
+
+<p align="center">
+  <a href="https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.0/NFDesk_0.1.0_x64-setup.exe">
+    <img src="https://img.shields.io/badge/Download_NFDesk_v0.1.0-(.exe)_~2.2_MB-6366f1?style=for-the-badge&logo=windows&logoColor=white" alt="Download NFDesk for Windows" />
+  </a>
+</p>
+
+| Package | Format | Architecture | Direct Download |
+|---|---|---|---|
+| **Windows Setup Installer** | `.exe` *(Standar)* | `x64` (64-bit) | [**Download `NFDesk_0.1.0_x64-setup.exe`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.0/NFDesk_0.1.0_x64-setup.exe) (~2.2 MB) |
+
+> 💡 **Quick Install:** Simply download the `.exe`, run the installer, and launch NFDesk from your desktop or start menu.
+
+---
+
 ## 💡 Why NFDesk? (The Motivation)
 
 NFDesk was born out of a real personal problem: **constant context-switching and losing focus across dozens of open tabs and apps.**
@@ -112,7 +130,9 @@ Your Obsidian Vault/
 
 ---
 
-## 🚀 Getting Started
+## 🛠️ Building from Source (For Developers)
+
+If you wish to contribute or build NFDesk from the source code:
 
 ### Prerequisites
 
@@ -120,7 +140,7 @@ Your Obsidian Vault/
 2. **Rust:** Latest stable toolchain ([Install Rust](https://www.rust-lang.org/tools/install))
 3. **C++ Build Tools:** Visual Studio C++ Build Tools on Windows (required by Tauri/Rust)
 
-### Installation & Development
+### Clone & Build
 
 1. **Clone the repository:**
    ```bash
