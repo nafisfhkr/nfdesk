@@ -1,6 +1,7 @@
 # Documentation
 Docs/
 docs/
+landing/
 
 # Environment variables & secrets
 .env
