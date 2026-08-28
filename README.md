@@ -26,14 +26,14 @@ Instead of switching back and forth between full-sized productivity apps, NFDesk
 Get the latest release for **Windows 10 / 11** (64-bit):
 
 <p align="center">
-  <a href="https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.0/NFDesk_0.1.0_x64-setup.exe">
-    <img src="https://img.shields.io/badge/Download_NFDesk_v0.1.0-(.exe)_~2.2_MB-6366f1?style=for-the-badge&logo=windows&logoColor=white" alt="Download NFDesk for Windows" />
+  <a href="https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.1/NFDesk_0.1.1_x64-setup.exe">
+    <img src="https://img.shields.io/badge/Download_NFDesk_v0.1.1-(.exe)_~2.2_MB-6366f1?style=for-the-badge&logo=windows&logoColor=white" alt="Download NFDesk for Windows" />
   </a>
 </p>
 
 | Package | Format | Architecture | Direct Download |
 |---|---|---|---|
-| **Windows Setup Installer** | `.exe` *(Standar)* | `x64` (64-bit) | [**Download `NFDesk_0.1.0_x64-setup.exe`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.0/NFDesk_0.1.0_x64-setup.exe) (~2.2 MB) |
+| **Windows Setup Installer** | `.exe` *(Standar)* | `x64` (64-bit) | [**Download `NFDesk_0.1.1_x64-setup.exe`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.1/NFDesk_0.1.1_x64-setup.exe) (~2.2 MB) |
 
 > 💡 **Quick Install:** Simply download the `.exe`, run the installer, and launch NFDesk from your desktop or start menu.
 
@@ -66,6 +66,8 @@ NFDesk solves this by sitting quietly in the corner of your desktop:
   - Daily checklist synchronized directly with your local Obsidian Vault.
   - Formatted in standard markdown checklist syntax (`- [ ]` and `- [x]`).
   - Isolated daily files organized in configurable subfolders (`Tasks/YYYY-MM-DD.md`).
+  - **1-Click Focus:** Click ▶ on any task to instantly populate the Timer tab's "What are you working on?" and auto-start the Pomodoro session.
+  - **Smart Time-Tag Badges:** Tasks like `[25m] Design Review` or `[09:00 - 10:30] Fix auth bug` render as a styled indigo pill badge while the file remains 100% Obsidian-compatible `- [ ] [25m] Design Review`.
 
 - ⚡ **Quick Daily Note Capture:**
   - Fast thought capture without opening external note apps.
@@ -92,6 +94,9 @@ NFDesk is built for speed and seamless keyboard-driven workflows:
 | Shortcut | Scope | Action |
 |---|---|---|
 | **`Alt + Shift + N`** | **Global (OS-wide)** | Toggle Show / Hide NFDesk widget from any application. |
+| **`1` / `Ctrl+1`** | **Global (app)** | Switch to **Timer** tab *(with typing guard)*. |
+| **`2` / `Ctrl+2`** | **Global (app)** | Switch to **Tasks** tab *(with typing guard)*. |
+| **`3` / `Ctrl+3`** | **Global (app)** | Switch to **Note** tab *(with typing guard)*. |
 | **`Space`** | **Timer Tab** | Start / Pause / Resume the focus timer *(Includes smart typing guard)*. |
 | **`Ctrl + Enter`** | **Note Tab** | Instantly save quick note to today's daily markdown file. |
 | **`Enter`** | **Tasks Tab** | Add a new task item to today's checklist. |

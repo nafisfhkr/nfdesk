@@ -39,7 +39,7 @@ function App() {
     isEnabled().then(setAutoStartEnabled).catch(() => setAutoStartEnabled(false));
   }, []);
 
-  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer.
+  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer, 1/2/3 switches tabs
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -55,6 +55,27 @@ function App() {
         target?.tagName === 'INPUT' ||
         target?.tagName === 'TEXTAREA' ||
         target?.isContentEditable;
+
+      // Tab switching shortcuts: 1 (Timer), 2 (Tasks), 3 (Note) or Ctrl+1, Ctrl+2, Ctrl+3
+      if (!showSettings) {
+        if (!isTyping || e.ctrlKey) {
+          if (e.key === '1') {
+            e.preventDefault();
+            setActiveTab('TIMER');
+            return;
+          }
+          if (e.key === '2') {
+            e.preventDefault();
+            setActiveTab('TASKS');
+            return;
+          }
+          if (e.key === '3') {
+            e.preventDefault();
+            setActiveTab('NOTE');
+            return;
+          }
+        }
+      }
 
       if (e.key === ' ' && !isTyping && activeTab === 'TIMER') {
         e.preventDefault();
@@ -150,6 +171,15 @@ function App() {
       setIsAlwaysOnTop(nextState);
     } catch {
       setIsAlwaysOnTop(!isAlwaysOnTop);
+    }
+  };
+
+  const handleFocusTask = (taskTitle: string) => {
+    const cleanTitle = taskTitle.replace(/^\[.*?\]\s*/, '').trim();
+    setTask(cleanTitle || taskTitle);
+    setActiveTab('TIMER');
+    if (status === 'IDLE') {
+      start();
     }
   };
 
@@ -401,7 +431,7 @@ function App() {
                 transition={{ duration: 0.15 }}
                 className="flex-1 w-full h-full"
               >
-                <TasksView />
+                <TasksView onFocusTask={handleFocusTask} />
               </motion.div>
             )}
 
@@ -420,36 +450,44 @@ function App() {
           </AnimatePresence>
 
           {/* Bottom Navigation Bar */}
-          <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-around">
+          <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 mb-4 mt-2">
             <button
               onClick={() => setActiveTab('TIMER')}
-              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+              className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === 'TIMER'
-                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Clock className="w-5 h-5" />
+              <Clock className="w-3.5 h-3.5" />
+              <span>Timer</span>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">1</kbd>
             </button>
+
             <button
               onClick={() => setActiveTab('TASKS')}
-              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+              className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === 'TASKS'
-                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <CheckSquare className="w-5 h-5" />
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span>Tasks</span>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">2</kbd>
             </button>
+
             <button
               onClick={() => setActiveTab('NOTE')}
-              className={`p-2.5 flex-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-300 ${
+              className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === 'NOTE'
-                  ? 'text-indigo-300 bg-indigo-500/10 shadow-inner'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Edit3 className="w-5 h-5" />
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Note</span>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">3</kbd>
             </button>
           </div>
 
@@ -576,19 +614,22 @@ function App() {
                 </span>
               </button>
 
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 border border-white/10 hover:bg-white/5 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveSettings}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
-                >
-                  Save
-                </button>
+              <div className="flex justify-between items-center gap-2 mt-4">
+                <span className="text-[11px] text-slate-500 font-mono">v0.1.1</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 border border-white/10 hover:bg-white/5 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveSettings}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
