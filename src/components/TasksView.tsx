@@ -1,9 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Trash2, Plus, FolderOpen } from 'lucide-react';
+import { Check, Trash2, Plus, FolderOpen, Play } from 'lucide-react';
 import { readTasksFromVault, saveTasksToVault, getVaultPath, getTasksFolder, todayFilename, type MarkdownTask } from '../lib/markdown';
 
-export default function TasksView() {
+export interface TasksViewProps {
+  onFocusTask?: (taskTitle: string) => void;
+}
+
+function parseTaskTitle(rawTitle: string): { tag: string | null; title: string } {
+  const match = rawTitle.match(/^\[(.*?)\]\s*(.*)$/);
+  if (match) {
+    return {
+      tag: match[1],
+      title: match[2] || rawTitle,
+    };
+  }
+  return { tag: null, title: rawTitle };
+}
+
+export default function TasksView({ onFocusTask }: TasksViewProps) {
   const [tasks, setTasks] = useState<MarkdownTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -150,10 +165,39 @@ export default function TasksView() {
                   {task.completed && <Check className="w-3.5 h-3.5 text-white" />}
                 </button>
 
-                {/* Task Title */}
-                <span className={`flex-1 text-sm truncate transition-all duration-300 ${task.completed ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-                  {task.title}
-                </span>
+                {/* Task Title with optional Time Badge */}
+                {(() => {
+                  const { tag, title } = parseTaskTitle(task.title);
+                  return (
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      {tag && (
+                        <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
+                          task.completed
+                            ? 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                            : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                        }`}>
+                          {tag}
+                        </span>
+                      )}
+                      <span className={`text-sm truncate transition-all duration-300 ${
+                        task.completed ? 'text-slate-500 line-through' : 'text-slate-200'
+                      }`}>
+                        {title}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Focus / Play Button */}
+                {onFocusTask && !task.completed && (
+                  <button
+                    onClick={() => onFocusTask(task.title)}
+                    title="Focus on this task"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition-all duration-200"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  </button>
+                )}
 
                 {/* Delete Button */}
                 <button
