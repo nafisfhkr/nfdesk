@@ -4,17 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useTimer, formatTime, getDurationMin, getDurationMs, DURATION_KEYS } from './hooks/useTimer';
 import {
-  getVaultPath,
-  setVaultPath,
   appendDailyNote,
-  getDailyNotesFolder,
-  setDailyNotesFolder,
-  getTasksFolder,
-  setTasksFolder,
   timeStamp,
 } from './lib/markdown';
 import TasksView from './components/TasksView';
 import NoteView from './components/NoteView';
+import VaultSetup from './components/VaultSetup';
 import { notifyTimerCompletion } from './lib/notifications';
 
 function App() {
@@ -23,9 +18,6 @@ function App() {
   const [task, setTask] = useState('');
   const [activeTab, setActiveTab] = useState<'TIMER' | 'TASKS' | 'NOTE'>('TIMER');
   const [showSettings, setShowSettings] = useState(false);
-  const [vaultPath, setVaultPathState] = useState(getVaultPath());
-  const [dailyNotesFolder, setDailyNotesFolderState] = useState(getDailyNotesFolder());
-  const [tasksFolder, setTasksFolderState] = useState(getTasksFolder());
   const [logStatus, setLogStatus] = useState<'IDLE' | 'SAVING' | 'DONE' | 'ERROR'>('IDLE');
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [focusMinutes, setFocusMinutes] = useState(() => getDurationMin('FOCUS'));
@@ -102,9 +94,6 @@ function App() {
   const saveSettings = () => {
     localStorage.setItem(DURATION_KEYS.FOCUS, focusMinutes.toString());
     localStorage.setItem(DURATION_KEYS.BREAK, breakMinutes.toString());
-    setVaultPath(vaultPath);
-    setDailyNotesFolder(dailyNotesFolder);
-    setTasksFolder(tasksFolder);
     reset();
     setShowSettings(false);
   };
@@ -525,43 +514,8 @@ function App() {
                 </button>
               </div>
 
-              <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">
-                Obsidian Vault Path
-              </label>
-              <input
-                autoFocus
-                type="text"
-                value={vaultPath}
-                onChange={(e) => setVaultPathState(e.target.value)}
-                placeholder="C:\Users\Nafis\Documents\Obsidian"
-                className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
-              />
-
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="min-w-0">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate" title="Daily Notes Subfolder">
-                    Daily Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={dailyNotesFolder}
-                    onChange={(e) => setDailyNotesFolderState(e.target.value)}
-                    placeholder="Daily Notes"
-                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate" title="Tasks Subfolder">
-                    Tasks Folder
-                  </label>
-                  <input
-                    type="text"
-                    value={tasksFolder}
-                    onChange={(e) => setTasksFolderState(e.target.value)}
-                    placeholder="Tasks"
-                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
-                  />
-                </div>
+              <div className="mb-4">
+                <VaultSetup />
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-4">
@@ -615,7 +569,7 @@ function App() {
               </button>
 
               <div className="flex justify-between items-center gap-2 mt-4">
-                <span className="text-[11px] text-slate-500 font-mono">v0.1.1</span>
+                <span className="text-[11px] text-slate-500 font-mono">v0.1.2</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowSettings(false)}
