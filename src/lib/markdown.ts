@@ -1,40 +1,73 @@
 import { invoke } from '@tauri-apps/api/core';
 
-const VAULT_PATH_KEY = 'nfdesk-vault-path';
-const DAILY_NOTES_FOLDER_KEY = 'nfdesk-daily-notes-folder';
-const TASKS_FOLDER_KEY = 'nfdesk-tasks-folder';
-
-const DEFAULT_DAILY_NOTES_FOLDER = 'Daily Notes';
-const DEFAULT_TASKS_FOLDER = 'Tasks';
-
 export interface MarkdownTask {
   id: string;
   title: string;
   completed: boolean;
 }
 
-export function getVaultPath(): string {
-  return localStorage.getItem(VAULT_PATH_KEY) ?? '';
+export interface AppSettingsResponse {
+  vault_configured: boolean;
+  vault_path: string | null;
 }
 
-export function setVaultPath(path: string) {
-  localStorage.setItem(VAULT_PATH_KEY, path);
+export interface VaultWarning {
+  code: string;
+  message: string;
 }
 
-export function getDailyNotesFolder(): string {
-  return localStorage.getItem(DAILY_NOTES_FOLDER_KEY) || DEFAULT_DAILY_NOTES_FOLDER;
+export interface VaultPreview {
+  canonical_vault_path: string;
+  is_obsidian_vault: boolean;
+  directories_to_create: string[];
+  existing_directories: string[];
+  warnings: VaultWarning[];
 }
 
-export function setDailyNotesFolder(folder: string) {
-  localStorage.setItem(DAILY_NOTES_FOLDER_KEY, folder.trim() || DEFAULT_DAILY_NOTES_FOLDER);
+export interface VaultSetupResult {
+  vault_path: string;
+  manifest_created: boolean;
+  created_directories: string[];
+  warnings: VaultWarning[];
 }
 
-export function getTasksFolder(): string {
-  return localStorage.getItem(TASKS_FOLDER_KEY) || DEFAULT_TASKS_FOLDER;
+export type ErrorCode =
+  | 'VAULT_NOT_CONFIGURED'
+  | 'VAULT_NOT_ACCESSIBLE'
+  | 'PATH_OUTSIDE_VAULT'
+  | 'INVALID_FILE_NAME'
+  | 'VAULT_SETUP_FAILED'
+  | 'MANIFEST_INVALID';
+
+export interface AppError {
+  code: ErrorCode | string;
+  message: string;
+  recoverable: boolean;
 }
 
-export function setTasksFolder(folder: string) {
-  localStorage.setItem(TASKS_FOLDER_KEY, folder.trim() || DEFAULT_TASKS_FOLDER);
+export function isAppError(err: unknown): err is AppError {
+  if (typeof err === 'object' && err !== null) {
+    const candidate = err as Record<string, unknown>;
+    return (
+      typeof candidate.code === 'string' &&
+      typeof candidate.message === 'string' &&
+      typeof candidate.recoverable === 'boolean'
+    );
+  }
+  return false;
+}
+
+export function formatErrorMessage(err: unknown): string {
+  if (isAppError(err)) {
+    return err.message;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === 'string') {
+    return err;
+  }
+  return 'Terjadi kesalahan yang tidak terduga';
 }
 
 export function todayFilename(): string {
@@ -48,46 +81,30 @@ export function timeStamp(d = new Date()): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function requireVaultPath(): string {
-  const vaultPath = getVaultPath();
-  if (!vaultPath) {
-    throw new Error('Set your Obsidian vault path in Settings first.');
-  }
-  return vaultPath;
+export async function getVaultSettings(): Promise<AppSettingsResponse> {
+  return invoke<AppSettingsResponse>('settings_get');
 }
 
-export async function readTasksFromVault(filename?: string): Promise<MarkdownTask[]> {
-  return invoke<MarkdownTask[]>('read_markdown_tasks', {
-    vaultPath: requireVaultPath(),
-    folder: getTasksFolder(),
-    filename: filename ?? todayFilename(),
+export async function validateVault(vaultPath: string): Promise<VaultPreview> {
+  return invoke<VaultPreview>('vault_validate', {
+    request: { vault_path: vaultPath },
   });
 }
 
-export async function saveTasksToVault(tasks: MarkdownTask[], filename?: string): Promise<boolean> {
-  return invoke<boolean>('save_markdown_tasks', {
-    vaultPath: requireVaultPath(),
-    folder: getTasksFolder(),
-    filename: filename ?? todayFilename(),
-    tasks,
+export async function setupVault(vaultPath: string): Promise<VaultSetupResult> {
+  return invoke<VaultSetupResult>('vault_setup', {
+    request: { vault_path: vaultPath },
   });
 }
 
-export async function appendDailyNote(content: string, filename?: string): Promise<boolean> {
-  return invoke<boolean>('append_to_markdown', {
-    vaultPath: requireVaultPath(),
-    folder: getDailyNotesFolder(),
-    filename: filename ?? todayFilename(),
-    content,
-  });
+export async function readTasksFromVault(date?: string): Promise<MarkdownTask[]> {
+  return invoke<MarkdownTask[]>('read_markdown_tasks', { date });
 }
 
-// Kept for callers that only need a raw append; appends to the vault root.
-export async function appendToMarkdown(content: string, filename?: string) {
-  return invoke<boolean>('append_to_markdown', {
-    vaultPath: requireVaultPath(),
-    folder: '',
-    filename: filename ?? todayFilename(),
-    content,
-  });
+export async function saveTasksToVault(tasks: MarkdownTask[], date?: string): Promise<boolean> {
+  return invoke<boolean>('save_markdown_tasks', { tasks, date });
+}
+
+export async function appendDailyNote(content: string, date?: string): Promise<boolean> {
+  return invoke<boolean>('append_to_markdown', { content, date });
 }

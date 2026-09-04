@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Trash2, Plus, FolderOpen, Play } from 'lucide-react';
-import { readTasksFromVault, saveTasksToVault, getVaultPath, getTasksFolder, todayFilename, type MarkdownTask } from '../lib/markdown';
+import {
+  readTasksFromVault,
+  saveTasksToVault,
+  getVaultSettings,
+  todayFilename,
+  formatErrorMessage,
+  isAppError,
+  type MarkdownTask,
+} from '../lib/markdown';
 
 export interface TasksViewProps {
   onFocusTask?: (taskTitle: string) => void;
@@ -22,15 +30,26 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
   const [tasks, setTasks] = useState<MarkdownTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isVaultConfigured, setIsVaultConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
+      const settings = await getVaultSettings();
+      setIsVaultConfigured(settings.vault_configured);
+      if (!settings.vault_configured) {
+        setIsLoading(false);
+        return;
+      }
       setTasks(await readTasksFromVault());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load tasks');
+      if (isAppError(e) && e.code === 'VAULT_NOT_CONFIGURED') {
+        setIsVaultConfigured(false);
+      } else {
+        setError(formatErrorMessage(e));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +70,7 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
     try {
       await saveTasksToVault(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save tasks');
+      setError(formatErrorMessage(e));
     }
   };
 
@@ -80,14 +99,12 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
     sync(tasks.filter(t => t.id !== id));
   };
 
-  const vaultPath = getVaultPath();
-
-  if (!vaultPath) {
+  if (isVaultConfigured === false) {
     return (
       <div className="flex flex-col h-full items-center justify-center text-center text-slate-400 px-6">
         <FolderOpen className="w-10 h-10 mb-3 text-indigo-400/60" />
         <p className="text-sm">
-          Please set your Obsidian Vault path in Settings to enable task synchronization.
+          Obsidian Vault belum terhubung. Silakan buka Settings dan pilih Vault untuk mengaktifkan sinkronisasi task.
         </p>
       </div>
     );
@@ -101,7 +118,7 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
           <span className="text-[11px] font-semibold tracking-wide uppercase text-indigo-300/80 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
             Tasks • {todayFilename().replace('.md', '')}
           </span>
-          <span className="text-[10px] text-slate-500">in {getTasksFolder()}</span>
+          <span className="text-[10px] text-slate-500">in Tasks/</span>
         </div>
 
         {error && (

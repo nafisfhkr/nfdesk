@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Check, AlertTriangle } from 'lucide-react';
-import { appendDailyNote, timeStamp } from '../lib/markdown';
+import { appendDailyNote, formatErrorMessage, timeStamp } from '../lib/markdown';
 
 type ToastState = { kind: 'success' | 'error'; msg: string } | null;
 
@@ -30,8 +30,7 @@ export default function NoteView() {
       setNote('');
       setToast({ kind: 'success', msg: 'Note saved!' });
     } catch (e) {
-      console.error(e);
-      setToast({ kind: 'error', msg: e instanceof Error ? e.message : 'Failed to save note' });
+      setToast({ kind: 'error', msg: formatErrorMessage(e) });
     }
   };
 
