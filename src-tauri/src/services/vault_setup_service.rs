@@ -59,14 +59,14 @@ impl VaultSetupService {
         if vault_root.join("Tasks").is_dir() {
             warnings.push(VaultWarning {
                 code: "LEGACY_TASKS_DETECTED".to_string(),
-                message: "Direktori root Tasks lama terdeteksi, tidak akan dipindahkan pada v0.1.2; migrasi memerlukan preview dan backup di rilis berikutnya".to_string(),
+                message: "Direktori root Tasks lama terdeteksi dan dibiarkan sebagai arsip; data baru disimpan di NFDesk/Tasks.".to_string(),
             });
         }
 
         if vault_root.join("Daily Notes").is_dir() {
             warnings.push(VaultWarning {
                 code: "LEGACY_DAILY_NOTES_DETECTED".to_string(),
-                message: "Direktori Daily Notes lama terdeteksi, tidak akan dipindahkan pada v0.1.2; migrasi memerlukan preview dan backup di rilis berikutnya".to_string(),
+                message: "Direktori Daily Notes lama terdeteksi dan dibiarkan sebagai arsip; data baru disimpan di NFDesk/Daily.".to_string(),
             });
         }
 
@@ -121,13 +121,13 @@ impl VaultSetupService {
         if vault_root.join("Tasks").is_dir() {
             warnings.push(VaultWarning {
                 code: "LEGACY_TASKS_DETECTED".to_string(),
-                message: "Direktori root Tasks lama terdeteksi, tidak akan dipindahkan pada v0.1.2; migrasi memerlukan preview dan backup di rilis berikutnya".to_string(),
+                message: "Direktori root Tasks lama terdeteksi dan dibiarkan sebagai arsip; data baru disimpan di NFDesk/Tasks.".to_string(),
             });
         }
         if vault_root.join("Daily Notes").is_dir() {
             warnings.push(VaultWarning {
                 code: "LEGACY_DAILY_NOTES_DETECTED".to_string(),
-                message: "Direktori Daily Notes lama terdeteksi, tidak akan dipindahkan pada v0.1.2; migrasi memerlukan preview dan backup di rilis berikutnya".to_string(),
+                message: "Direktori Daily Notes lama terdeteksi dan dibiarkan sebagai arsip; data baru disimpan di NFDesk/Daily.".to_string(),
             });
         }
 

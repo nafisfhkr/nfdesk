@@ -118,7 +118,7 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
           <span className="text-[11px] font-semibold tracking-wide uppercase text-indigo-300/80 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
             Tasks • {todayFilename().replace('.md', '')}
           </span>
-          <span className="text-[10px] text-slate-500">in Tasks/</span>
+          <span className="text-[10px] text-slate-500">in NFDesk/Tasks/</span>
         </div>
 
         {error && (
