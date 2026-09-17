@@ -1,8 +1,8 @@
+use chrono::{Datelike, NaiveDate};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use chrono::{Datelike, NaiveDate};
 use uuid::Uuid;
 
 use crate::domain::schema::{
@@ -13,12 +13,8 @@ use crate::errors::AppError;
 use crate::repositories::settings_repository::{AppSettings, SettingsRepository};
 use crate::services::path_guard::PathGuard;
 
-pub const SKELETON_DIRECTORIES: [&str; 4] = [
-    "NFDesk",
-    "NFDesk/Tasks",
-    "NFDesk/Daily",
-    "NFDesk/.nfdesk",
-];
+pub const SKELETON_DIRECTORIES: [&str; 4] =
+    ["NFDesk", "NFDesk/Tasks", "NFDesk/Daily", "NFDesk/.nfdesk"];
 
 pub const MANIFEST_RELATIVE_PATH: &str = "NFDesk/.nfdesk/manifest.json";
 
@@ -29,7 +25,9 @@ pub struct VaultSetupService {
 
 impl VaultSetupService {
     pub fn new(settings_repository: Arc<SettingsRepository>) -> Self {
-        Self { settings_repository }
+        Self {
+            settings_repository,
+        }
     }
 
     pub fn for_test(app_data_path: &Path) -> Self {
@@ -40,6 +38,42 @@ impl VaultSetupService {
 
     pub fn settings_repository(&self) -> Arc<SettingsRepository> {
         self.settings_repository.clone()
+    }
+
+    pub fn get_active_vault_guard(&self) -> Result<PathGuard, AppError> {
+        let settings = self.settings_repository.load()?;
+        let vault_path = match settings.and_then(|s| s.vault_path) {
+            Some(p) if !p.trim().is_empty() => p,
+            _ => {
+                return Err(AppError::vault_not_configured(
+                    "Vault belum dikonfigurasi. Silakan pilih Vault di Settings.",
+                ))
+            }
+        };
+        PathGuard::new(Path::new(&vault_path))
+    }
+
+    pub fn load_active_layout(&self) -> Result<VaultLayout, AppError> {
+        let guard = self.get_active_vault_guard()?;
+        let manifest_path = guard.resolve_relative(Path::new(MANIFEST_RELATIVE_PATH))?;
+        if !manifest_path.exists() {
+            return Err(AppError::manifest_invalid(
+                "Manifest Vault belum ada. Silakan jalankan setup Vault terlebih dahulu.",
+            ));
+        }
+        let content = fs::read_to_string(&manifest_path)
+            .map_err(|e| AppError::manifest_invalid(format!("Gagal membaca manifest: {e}")))?;
+        let manifest: VaultManifest = serde_json::from_str(&content).map_err(|e| {
+            AppError::manifest_invalid(format!(
+                "Manifest corrupt atau bukan format yang valid: {e}"
+            ))
+        })?;
+        if manifest.product != "NFDesk" || manifest.schema_version != SCHEMA_VERSION {
+            return Err(AppError::manifest_invalid(
+                "Manifest memiliki schema_version atau product yang tidak kompatibel",
+            ));
+        }
+        Ok(VaultLayout::new(guard, manifest))
     }
 
     pub fn validate(&self, request: &VaultValidationRequest) -> Result<VaultPreview, AppError> {
@@ -73,11 +107,12 @@ impl VaultSetupService {
         // Validate manifest if present
         let manifest_path = guard.resolve_relative(Path::new(MANIFEST_RELATIVE_PATH))?;
         if manifest_path.exists() {
-            let content = fs::read_to_string(&manifest_path).map_err(|e| {
-                AppError::manifest_invalid(format!("Gagal membaca manifest: {e}"))
-            })?;
+            let content = fs::read_to_string(&manifest_path)
+                .map_err(|e| AppError::manifest_invalid(format!("Gagal membaca manifest: {e}")))?;
             let manifest: VaultManifest = serde_json::from_str(&content).map_err(|e| {
-                AppError::manifest_invalid(format!("Manifest corrupt atau bukan format yang valid: {e}"))
+                AppError::manifest_invalid(format!(
+                    "Manifest corrupt atau bukan format yang valid: {e}"
+                ))
             })?;
             if manifest.product != "NFDesk" || manifest.schema_version != SCHEMA_VERSION {
                 return Err(AppError::manifest_invalid(
@@ -149,11 +184,12 @@ impl VaultSetupService {
         // Handle manifest
         let manifest_path = guard.resolve_relative(Path::new(MANIFEST_RELATIVE_PATH))?;
         let manifest_created = if manifest_path.exists() {
-            let content = fs::read_to_string(&manifest_path).map_err(|e| {
-                AppError::manifest_invalid(format!("Gagal membaca manifest: {e}"))
-            })?;
+            let content = fs::read_to_string(&manifest_path)
+                .map_err(|e| AppError::manifest_invalid(format!("Gagal membaca manifest: {e}")))?;
             let manifest: VaultManifest = serde_json::from_str(&content).map_err(|e| {
-                AppError::manifest_invalid(format!("Manifest corrupt atau bukan format yang valid: {e}"))
+                AppError::manifest_invalid(format!(
+                    "Manifest corrupt atau bukan format yang valid: {e}"
+                ))
             })?;
             if manifest.product != "NFDesk" || manifest.schema_version != SCHEMA_VERSION {
                 return Err(AppError::manifest_invalid(
@@ -205,10 +241,7 @@ impl VaultSetupService {
 
             fs::rename(&temp_path, &manifest_path).map_err(|e| {
                 let _ = fs::remove_file(&temp_path);
-                AppError::vault_setup_failed(
-                    format!("Gagal atomic rename manifest: {e}"),
-                    true,
-                )
+                AppError::vault_setup_failed(format!("Gagal atomic rename manifest: {e}"), true)
             })?;
 
             true
@@ -302,6 +335,18 @@ impl VaultLayout {
             date.month(),
             date.format("%Y-%m-%d")
         )))
+    }
+
+    pub fn task_move_journal_file(&self) -> Result<PathBuf, AppError> {
+        let rel_dir = Path::new("NFDesk/.nfdesk/task-transactions");
+        let dir = self.guard.resolve_relative(rel_dir)?;
+        if !dir.exists() {
+            fs::create_dir_all(&dir).map_err(|_| {
+                AppError::vault_not_accessible("Tidak dapat membuat direktori transaksi task.")
+            })?;
+        }
+        self.guard
+            .resolve_safe_file(rel_dir, "task-move-recovery.json", &["json"])
     }
 }
 
@@ -404,7 +449,10 @@ mod tests {
         assert!(result.manifest_created);
 
         assert_eq!(fs::read_to_string(&user_doc).unwrap(), "# Important Note");
-        assert_eq!(fs::read_to_string(&task_file).unwrap(), "- [ ] Existing Task");
+        assert_eq!(
+            fs::read_to_string(&task_file).unwrap(),
+            "- [ ] Existing Task"
+        );
     }
 
     #[test]
@@ -446,10 +494,7 @@ mod tests {
         let result = service.setup(req).unwrap();
         let saved_settings = service.settings_repository().load().unwrap();
         assert!(saved_settings.is_some());
-        assert_eq!(
-            saved_settings.unwrap().vault_path,
-            Some(result.vault_path)
-        );
+        assert_eq!(saved_settings.unwrap().vault_path, Some(result.vault_path));
     }
 
     #[test]
