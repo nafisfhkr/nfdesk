@@ -1,15 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Trash2, Plus, FolderOpen, Play } from 'lucide-react';
+import { Check, Trash2, Plus, FolderOpen, Play, Ban } from 'lucide-react';
 import {
-  readTasksFromVault,
-  saveTasksToVault,
   getVaultSettings,
-  todayFilename,
   formatErrorMessage,
   isAppError,
-  type MarkdownTask,
 } from '../lib/markdown';
+import {
+  listTasksForDate,
+  createTask,
+  completeTask,
+  cancelTask,
+  previewLegacyTasks,
+  todayLocalDate,
+  type Task,
+} from '../lib/tasks';
 
 export interface TasksViewProps {
   onFocusTask?: (taskTitle: string) => void;
@@ -27,11 +32,14 @@ function parseTaskTitle(rawTitle: string): { tag: string | null; title: string }
 }
 
 export default function TasksView({ onFocusTask }: TasksViewProps) {
-  const [tasks, setTasks] = useState<MarkdownTask[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isVaultConfigured, setIsVaultConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [migrationPreviewAvailable, setMigrationPreviewAvailable] = useState(false);
+  const [migrationPreviewCount, setMigrationPreviewCount] = useState<number | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const loadTasks = useCallback(async () => {
     setIsLoading(true);
@@ -43,7 +51,10 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
         setIsLoading(false);
         return;
       }
-      setTasks(await readTasksFromVault());
+      const today = todayLocalDate();
+      const res = await listTasksForDate(today);
+      setTasks(res.tasks);
+      setMigrationPreviewAvailable(res.migration_preview_available);
     } catch (e) {
       if (isAppError(e) && e.code === 'VAULT_NOT_CONFIGURED') {
         setIsVaultConfigured(false);
@@ -65,24 +76,21 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
     return () => window.removeEventListener('focus', onFocus);
   }, [loadTasks]);
 
-  const sync = async (next: MarkdownTask[]) => {
-    setTasks(next);
+  const addTask = async () => {
+    const trimmed = newTaskTitle.trim();
+    if (!trimmed) return;
+    setError(null);
     try {
-      await saveTasksToVault(next);
+      const today = todayLocalDate();
+      const created = await createTask({
+        title: trimmed,
+        planned_date: today,
+      });
+      setTasks((prev) => [...prev, created]);
+      setNewTaskTitle('');
     } catch (e) {
       setError(formatErrorMessage(e));
     }
-  };
-
-  const addTask = () => {
-    if (newTaskTitle.trim() === '') return;
-    const newTask: MarkdownTask = {
-      id: crypto.randomUUID(),
-      title: newTaskTitle.trim(),
-      completed: false,
-    };
-    sync([...tasks, newTask]);
-    setNewTaskTitle('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -91,12 +99,42 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
     }
   };
 
-  const toggleTask = (id: string) => {
-    sync(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const toggleTask = async (task: Task) => {
+    if (task.status === 'completed' || task.status === 'cancelled') {
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await completeTask(task.id, task.planned_date);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    }
   };
 
-  const deleteTask = (id: string) => {
-    sync(tasks.filter(t => t.id !== id));
+  const handleCancelTask = async (task: Task) => {
+    if (task.status === 'cancelled') {
+      return;
+    }
+    setError(null);
+    try {
+      const updated = await cancelTask(task.id, task.planned_date);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    }
+  };
+
+  const handlePreviewLegacy = async () => {
+    try {
+      setPreviewLoading(true);
+      const preview = await previewLegacyTasks(todayLocalDate());
+      setMigrationPreviewCount(preview.items.length);
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   if (isVaultConfigured === false) {
@@ -116,14 +154,44 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
         {/* Date Header */}
         <div className="mb-3 flex items-center gap-2">
           <span className="text-[11px] font-semibold tracking-wide uppercase text-indigo-300/80 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
-            Tasks • {todayFilename().replace('.md', '')}
+            Tasks • {todayLocalDate()}
           </span>
           <span className="text-[10px] text-slate-500">in NFDesk/Tasks/</span>
         </div>
 
+        {/* Migration Preview Banner */}
+        {migrationPreviewAvailable && (
+          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 flex flex-col gap-2">
+            <div>
+              File checklist lama terdeteksi dan belum dimigrasikan. File legacy tetap utuh.
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePreviewLegacy}
+                disabled={previewLoading}
+                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 rounded-lg text-[11px] font-medium transition-colors disabled:opacity-50"
+              >
+                {previewLoading ? 'Memeriksa...' : 'Pratinjau Checklist Lama'}
+              </button>
+              {migrationPreviewCount !== null && (
+                <span className="text-amber-300/80 text-[11px]">
+                  {migrationPreviewCount} item checklist ditemukan.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Error Banner with Retry */}
         {error && (
-          <div className="mb-3 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl">
-            {error}
+          <div className="mb-3 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl flex items-center justify-between gap-2">
+            <span>{error}</span>
+            <button
+              onClick={() => loadTasks()}
+              className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 rounded border border-rose-500/30 text-[10px] font-medium transition-colors flex-shrink-0"
+            >
+              Coba Lagi
+            </button>
           </div>
         )}
 
@@ -161,52 +229,71 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
                 No tasks yet. Add one above!
               </motion.div>
             )}
-            {tasks.map(task => (
+            {tasks.map((task) => (
               <motion.div
                 key={task.id}
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9, x: -10 }}
                 transition={{ duration: 0.2 }}
-                className="group flex items-center gap-3 p-3 bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 rounded-xl transition-all duration-200"
+                className={`group flex items-center gap-3 p-3 bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 rounded-xl transition-all duration-200 ${
+                  task.status === 'cancelled' ? 'opacity-60' : ''
+                }`}
               >
                 {/* Custom Checkbox */}
                 <button
-                  onClick={() => toggleTask(task.id)}
+                  onClick={() => toggleTask(task)}
+                  disabled={task.status === 'completed' || task.status === 'cancelled'}
                   className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
-                    task.completed
-                      ? 'bg-indigo-500 border-indigo-500'
+                    task.status === 'completed'
+                      ? 'bg-indigo-500 border-indigo-500 cursor-default'
+                      : task.status === 'cancelled'
+                      ? 'bg-slate-700/50 border-slate-600 text-slate-500 cursor-default'
                       : 'border-slate-500 hover:border-indigo-400 bg-white/5'
                   }`}
                 >
-                  {task.completed && <Check className="w-3.5 h-3.5 text-white" />}
+                  {task.status === 'completed' && <Check className="w-3.5 h-3.5 text-white" />}
+                  {task.status === 'cancelled' && <Ban className="w-3 h-3 text-slate-400" />}
                 </button>
 
-                {/* Task Title with optional Time Badge */}
+                {/* Task Title with optional Tag */}
                 {(() => {
                   const { tag, title } = parseTaskTitle(task.title);
                   return (
                     <div className="flex-1 flex items-center gap-2 min-w-0">
                       {tag && (
-                        <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
-                          task.completed
-                            ? 'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                            : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                        }`}>
+                        <span
+                          className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border transition-colors flex-shrink-0 ${
+                            task.status === 'completed' || task.status === 'cancelled'
+                              ? 'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                              : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                          }`}
+                        >
                           {tag}
                         </span>
                       )}
-                      <span className={`text-sm truncate transition-all duration-300 ${
-                        task.completed ? 'text-slate-500 line-through' : 'text-slate-200'
-                      }`}>
+                      <span
+                        className={`text-sm truncate transition-all duration-300 ${
+                          task.status === 'completed'
+                            ? 'text-slate-500 line-through'
+                            : task.status === 'cancelled'
+                            ? 'text-slate-500 line-through italic'
+                            : 'text-slate-200'
+                        }`}
+                      >
                         {title}
+                        {task.status === 'cancelled' && (
+                          <span className="ml-2 text-[10px] text-slate-500 no-underline not-italic">
+                            (Cancelled)
+                          </span>
+                        )}
                       </span>
                     </div>
                   );
                 })()}
 
                 {/* Focus / Play Button */}
-                {onFocusTask && !task.completed && (
+                {onFocusTask && task.status !== 'completed' && task.status !== 'cancelled' && (
                   <button
                     onClick={() => onFocusTask(task.title)}
                     title="Focus on this task"
@@ -216,13 +303,17 @@ export default function TasksView({ onFocusTask }: TasksViewProps) {
                   </button>
                 )}
 
-                {/* Delete Button */}
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-all duration-200"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {/* Cancel Task Button */}
+                {task.status !== 'cancelled' && (
+                  <button
+                    onClick={() => handleCancelTask(task)}
+                    title="Cancel task"
+                    aria-label="Cancel task"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-all duration-200"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

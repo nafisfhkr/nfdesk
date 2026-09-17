@@ -1,22 +1,38 @@
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
 macro_rules! define_semantic_id {
     ($name:ident) => {
-        #[derive(Clone, PartialEq, Eq, Hash)]
+        #[derive(Clone)]
         pub struct $name(pub Uuid, pub String);
+
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                self.0 == other.0
+            }
+        }
+
+        impl Eq for $name {}
+
+        impl std::hash::Hash for $name {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                self.0.hash(state);
+            }
+        }
 
         impl $name {
             pub fn new() -> Self {
                 let id = Uuid::new_v4();
-                let s = id.to_string();
+                let s = id.hyphenated().to_string();
                 Self(id, s)
             }
 
             pub fn from_uuid(id: Uuid) -> Self {
-                let s = id.to_string();
+                let s = id.hyphenated().to_string();
                 Self(id, s)
             }
 
@@ -67,7 +83,16 @@ macro_rules! define_semantic_id {
             {
                 let s = String::deserialize(deserializer)?;
                 let id = Uuid::parse_str(&s).map_err(serde::de::Error::custom)?;
-                Ok(Self(id, s))
+                if id.get_version() != Some(uuid::Version::Random) {
+                    return Err(serde::de::Error::custom("UUID version must be v4 (Random)"));
+                }
+                let canonical = id.hyphenated().to_string();
+                if s != canonical {
+                    return Err(serde::de::Error::custom(
+                        "UUID must be lowercase canonical hyphenated",
+                    ));
+                }
+                Ok(Self(id, canonical))
             }
         }
     };
@@ -141,6 +166,141 @@ pub struct AppSettingsResponse {
     pub vault_path: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    Planned,
+    InProgress,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskPriority {
+    Low,
+    Medium,
+    High,
+}
+
+/// Domain model for Task in NFDesk v0.1.3.
+///
+/// NOTE: actual_sessions and focused_minutes are intentionally omitted from Task.
+/// They will be computed read-only from EventRepository in v0.1.5 and are never manual user inputs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Task {
+    pub id: TaskId,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: TaskStatus,
+    pub priority: Option<TaskPriority>,
+    pub planned_date: NaiveDate,
+    pub scheduled_at: Option<DateTime<FixedOffset>>,
+    pub deadline_at: Option<DateTime<FixedOffset>>,
+    pub estimated_sessions: Option<u32>,
+    pub estimated_session_minutes: Option<u32>,
+    pub created_at: DateTime<FixedOffset>,
+    pub updated_at: DateTime<FixedOffset>,
+    pub completed_at: Option<DateTime<FixedOffset>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata_extensions: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskMetadataRecord {
+    pub id: TaskId,
+    pub status: TaskStatus,
+    #[serde(default)]
+    pub priority: Option<TaskPriority>,
+    pub planned_date: NaiveDate,
+    #[serde(default)]
+    pub scheduled_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub deadline_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub estimated_sessions: Option<u32>,
+    #[serde(default)]
+    pub estimated_session_minutes: Option<u32>,
+    pub created_at: DateTime<FixedOffset>,
+    pub updated_at: DateTime<FixedOffset>,
+    #[serde(default)]
+    pub completed_at: Option<DateTime<FixedOffset>>,
+    #[serde(flatten)]
+    pub metadata_extensions: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TaskCreateRequest {
+    pub title: String,
+    pub planned_date: NaiveDate,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub priority: Option<TaskPriority>,
+    #[serde(default)]
+    pub scheduled_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub deadline_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub estimated_sessions: Option<u32>,
+    #[serde(default)]
+    pub estimated_session_minutes: Option<u32>,
+}
+
+fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TaskPatch {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub description: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub priority: Option<Option<TaskPriority>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub scheduled_at: Option<Option<DateTime<FixedOffset>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub deadline_at: Option<Option<DateTime<FixedOffset>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub estimated_sessions: Option<Option<u32>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub estimated_session_minutes: Option<Option<u32>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskListResponse {
+    pub tasks: Vec<Task>,
+    pub date: NaiveDate,
+    pub migration_preview_available: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LegacyTaskPreviewItem {
+    pub proposed_id: TaskId,
+    pub title: String,
+    pub status: TaskStatus,
+    pub planned_date: NaiveDate,
+    pub previewed_at: DateTime<FixedOffset>,
+    pub original_line: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LegacyTaskMigrationPreview {
+    pub found: bool,
+    pub source_kind: String,
+    pub date: NaiveDate,
+    pub items: Vec<LegacyTaskPreviewItem>,
+    pub ignored_line_count: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,5 +339,24 @@ mod tests {
         let deserialized: TaskId = serde_json::from_str(&json).unwrap();
         assert_eq!(task, deserialized);
         assert_eq!(task.as_str(), deserialized.as_str());
+    }
+
+    #[test]
+    fn canonical_uuid_v4_validation() {
+        let canonical_str = r#""a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d""#;
+        let canonical: TaskId = serde_json::from_str(canonical_str).unwrap();
+        assert_eq!(canonical.as_str(), "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d");
+
+        // Uppercase must be rejected
+        let uppercase = canonical_str.to_uppercase();
+        assert!(serde_json::from_str::<TaskId>(&uppercase).is_err());
+
+        // Unhyphenated must be rejected
+        let unhyphenated = r#""a1b2c3d4e5f64a1b8c2d3e4f5a6b7c8d""#;
+        assert!(serde_json::from_str::<TaskId>(unhyphenated).is_err());
+
+        // Version not v4 (e.g. nil UUID) must be rejected
+        let nil_uuid = r#""00000000-0000-0000-0000-000000000000""#;
+        assert!(serde_json::from_str::<TaskId>(nil_uuid).is_err());
     }
 }

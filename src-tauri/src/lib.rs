@@ -15,6 +15,8 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 use crate::repositories::settings_repository::SettingsRepository;
+use crate::repositories::task_repository::TaskRepository;
+use crate::services::atomic_file_writer::PathLockRegistry;
 use crate::services::vault_setup_service::VaultSetupService;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -34,7 +36,10 @@ pub fn run() {
                 .map_err(|e| format!("Failed to get app data directory: {e}"))?;
             let settings_repo = Arc::new(SettingsRepository::new(app_data_dir));
             let vault_service = VaultSetupService::new(settings_repo);
-            app.manage(vault_service);
+            app.manage(vault_service.clone());
+            let lock_registry = Arc::new(PathLockRegistry::new());
+            let task_repo = TaskRepository::new(vault_service, lock_registry);
+            app.manage(task_repo);
 
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show NFDesk", true, None::<&str>)?;
@@ -92,8 +97,14 @@ pub fn run() {
             commands::vault::vault_validate,
             commands::vault::vault_setup,
             commands::legacy::append_to_markdown,
-            commands::legacy::read_markdown_tasks,
-            commands::legacy::save_markdown_tasks
+            commands::tasks::tasks_list_for_date,
+            commands::tasks::task_create,
+            commands::tasks::task_update,
+            commands::tasks::task_complete,
+            commands::tasks::task_cancel,
+            commands::tasks::task_reschedule,
+            commands::tasks::task_carry_to_today,
+            commands::tasks::task_legacy_preview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
