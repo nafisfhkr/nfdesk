@@ -23,19 +23,20 @@ Instead of switching back and forth between full-sized productivity apps, NFDesk
 
 ## 📥 Download & Quick Install
 
-Get the latest release for **Windows 10 / 11** (64-bit):
+The latest available build is **v0.1.2 (pre-release)** for **Windows 10 / 11** (64-bit):
 
 <p align="center">
-  <a href="https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.1/NFDesk_0.1.1_x64-setup.exe">
-    <img src="https://img.shields.io/badge/Download_NFDesk_v0.1.1-(.exe)_~2.2_MB-6366f1?style=for-the-badge&logo=windows&logoColor=white" alt="Download NFDesk for Windows" />
+  <a href="https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.2/NFDesk_0.1.2_x64-setup.exe">
+    <img src="https://img.shields.io/badge/Download_NFDesk_v0.1.2_Pre--release-(.exe)_~2.3_MB-6366f1?style=for-the-badge&logo=windows&logoColor=white" alt="Download NFDesk v0.1.2 pre-release for Windows" />
   </a>
 </p>
 
 | Package | Format | Architecture | Direct Download |
 |---|---|---|---|
-| **Windows Setup Installer** | `.exe` *(Standar)* | `x64` (64-bit) | [**Download `NFDesk_0.1.1_x64-setup.exe`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.1/NFDesk_0.1.1_x64-setup.exe) (~2.2 MB) |
+| **Windows Setup Installer** | `.exe` *(Standar)* | `x64` (64-bit) | [**Download `NFDesk_0.1.2_x64-setup.exe`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.2/NFDesk_0.1.2_x64-setup.exe) (~2.3 MB) |
+| **Windows MSI Installer** | `.msi` | `x64` (64-bit) | [**Download `NFDesk_0.1.2_x64_en-US.msi`**](https://github.com/nafisfhkr/nfdesk/releases/download/v0.1.2/NFDesk_0.1.2_x64_en-US.msi) (~3.6 MB) |
 
-> 💡 **Quick Install:** Simply download the `.exe`, run the installer, and launch NFDesk from your desktop or start menu.
+> 💡 **Quick Install:** Download the `.exe`, run the installer, then select your Obsidian Vault on the first launch. See the [v0.1.2 release notes](https://github.com/nafisfhkr/nfdesk/releases/tag/v0.1.2) for details.
 
 ---
 
@@ -50,7 +51,7 @@ NFDesk solves this by sitting quietly in the corner of your desktop:
 - **Immediate Task Context:** Always see exactly what you are currently focusing on without mental clutter.
 - **Fast Obsidian Capture:** Save quick thoughts and check off tasks directly into your local Obsidian markdown files.
 
-> **Note on Project Status:** NFDesk is currently in its **MVP (Minimum Viable Product)** stage, intentionally keeping things fast, silent, and zero-distraction for daily focused work. It will continue to evolve and grow with additional features over time.
+> **Project status:** NFDesk v0.1.2 is a **pre-release**. It delivers the native Vault setup and canonical NFDesk data layout; the wider v0.2.0 workflow remains under development.
 
 ---
 
@@ -65,13 +66,14 @@ NFDesk solves this by sitting quietly in the corner of your desktop:
 - 📝 **Obsidian & Markdown Task Synchronization:**
   - Daily checklist synchronized directly with your local Obsidian Vault.
   - Formatted in standard markdown checklist syntax (`- [ ]` and `- [x]`).
-  - Isolated daily files organized in configurable subfolders (`Tasks/YYYY-MM-DD.md`).
+  - New task files are stored at `NFDesk/Tasks/YYYY/MM/YYYY-MM-DD.md`.
+  - Existing legacy `Tasks/` and `Daily Notes/` folders are preserved; v0.1.2 does not move or overwrite them.
   - **1-Click Focus:** Click ▶ on any task to instantly populate the Timer tab's "What are you working on?" and auto-start the Pomodoro session.
   - **Smart Time-Tag Badges:** Tasks like `[25m] Design Review` or `[09:00 - 10:30] Fix auth bug` render as a styled indigo pill badge while the file remains 100% Obsidian-compatible `- [ ] [25m] Design Review`.
 
 - ⚡ **Quick Daily Note Capture:**
   - Fast thought capture without opening external note apps.
-  - Auto-timestamped entries (`- **HH:MM** — note content`) appended to `Daily Notes/YYYY-MM-DD.md`.
+  - Auto-timestamped entries (`- **HH:MM** — note content`) appended to `NFDesk/Daily/YYYY/MM/YYYY-MM-DD/YYYY-MM-DD Daily.md`.
   - Instant visual feedback with toast notifications.
 
 - 📊 **Focus Session Logging:**
@@ -108,7 +110,19 @@ NFDesk is built for speed and seamless keyboard-driven workflows:
 
 ## 📂 Obsidian Vault Structure
 
-NFDesk organizes user notes and tasks cleanly inside your configured Obsidian Vault folder:
+NFDesk organizes user notes and tasks cleanly inside your configured Obsidian Vault folder.
+
+Current v0.1.2 layout:
+
+```text
+<Obsidian Vault>/
+`-- NFDesk/
+    |-- Tasks/YYYY/MM/YYYY-MM-DD.md
+    |-- Daily/YYYY/MM/YYYY-MM-DD/YYYY-MM-DD Daily.md
+    `-- .nfdesk/manifest.json
+```
+
+Legacy layout preserved from v0.1.1 (not used for newly created files):
 
 ```text
 Your Obsidian Vault/
@@ -121,7 +135,7 @@ Your Obsidian Vault/
     └── 2026-08-15.md       <-- Daily checklist (- [ ] / - [x])
 ```
 
-*Subfolder names (`Daily Notes` and `Tasks`) can be customized in the Settings modal.*
+*v0.1.2 creates the `NFDesk/` structure automatically after setup. The legacy folders remain untouched and are not configured from Settings.*
 
 ---
 
