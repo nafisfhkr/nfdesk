@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::errors::AppError;

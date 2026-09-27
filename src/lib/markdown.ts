@@ -1,11 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export interface MarkdownTask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
 export interface AppSettingsResponse {
   vault_configured: boolean;
   vault_path: string | null;
@@ -37,7 +31,9 @@ export type ErrorCode =
   | 'PATH_OUTSIDE_VAULT'
   | 'INVALID_FILE_NAME'
   | 'VAULT_SETUP_FAILED'
-  | 'MANIFEST_INVALID';
+  | 'MANIFEST_INVALID'
+  | 'TASK_FILE_INVALID'
+  | 'DUPLICATE_TASK_ID';
 
 export interface AppError {
   code: ErrorCode | string;
@@ -95,14 +91,6 @@ export async function setupVault(vaultPath: string): Promise<VaultSetupResult> {
   return invoke<VaultSetupResult>('vault_setup', {
     request: { vault_path: vaultPath },
   });
-}
-
-export async function readTasksFromVault(date?: string): Promise<MarkdownTask[]> {
-  return invoke<MarkdownTask[]>('read_markdown_tasks', { date });
-}
-
-export async function saveTasksToVault(tasks: MarkdownTask[], date?: string): Promise<boolean> {
-  return invoke<boolean>('save_markdown_tasks', { tasks, date });
 }
 
 export async function appendDailyNote(content: string, date?: string): Promise<boolean> {

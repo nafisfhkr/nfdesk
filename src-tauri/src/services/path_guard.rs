@@ -44,12 +44,16 @@ impl PathGuard {
 
         if let Err(e) = file.write_all(b"probe") {
             let _ = fs::remove_file(&probe_path);
-            return Err(AppError::vault_not_accessible(format!("Failed to write probe data: {e}")));
+            return Err(AppError::vault_not_accessible(format!(
+                "Failed to write probe data: {e}"
+            )));
         }
 
         if let Err(e) = file.sync_all() {
             let _ = fs::remove_file(&probe_path);
-            return Err(AppError::vault_not_accessible(format!("Failed to sync probe file: {e}")));
+            return Err(AppError::vault_not_accessible(format!(
+                "Failed to sync probe file: {e}"
+            )));
         }
 
         drop(file);
@@ -64,11 +68,15 @@ impl PathGuard {
 
     pub fn resolve_relative(&self, relative: &Path) -> Result<PathBuf, AppError> {
         if relative.as_os_str().is_empty() {
-            return Err(AppError::path_outside_vault("Relative path cannot be empty"));
+            return Err(AppError::path_outside_vault(
+                "Relative path cannot be empty",
+            ));
         }
 
         if relative.is_absolute() {
-            return Err(AppError::path_outside_vault("Absolute paths are not allowed"));
+            return Err(AppError::path_outside_vault(
+                "Absolute paths are not allowed",
+            ));
         }
 
         let mut normal_components = Vec::new();
@@ -197,13 +205,14 @@ impl PathGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
     use crate::errors::ErrorCode;
+    use std::path::Path;
 
     #[test]
     fn rejects_parent_directory_escape() {
         let vault = tempfile::tempdir().unwrap();
-        let err = PathGuard::new(vault.path()).unwrap()
+        let err = PathGuard::new(vault.path())
+            .unwrap()
             .resolve_relative(Path::new("../outside.md"))
             .unwrap_err();
         assert_eq!(err.code, ErrorCode::PathOutsideVault);
@@ -213,7 +222,8 @@ mod tests {
     fn rejects_absolute_child_path() {
         let vault = tempfile::tempdir().unwrap();
         let absolute = std::env::temp_dir().join("outside.md");
-        let err = PathGuard::new(vault.path()).unwrap()
+        let err = PathGuard::new(vault.path())
+            .unwrap()
             .resolve_relative(&absolute)
             .unwrap_err();
         assert_eq!(err.code, ErrorCode::PathOutsideVault);
@@ -223,7 +233,9 @@ mod tests {
     fn resolves_known_relative_path_inside_vault() {
         let vault = tempfile::tempdir().unwrap();
         let guard = PathGuard::new(vault.path()).unwrap();
-        let target = guard.resolve_relative(Path::new("NFDesk/.nfdesk/manifest.json")).unwrap();
+        let target = guard
+            .resolve_relative(Path::new("NFDesk/.nfdesk/manifest.json"))
+            .unwrap();
         assert!(target.starts_with(guard.vault_root()));
     }
 
@@ -236,30 +248,41 @@ mod tests {
     #[test]
     fn filename_validation_rejects_separators_traversal_and_invalid_extensions() {
         assert_eq!(
-            PathGuard::validate_safe_filename("../escape.md", &["md"]).unwrap_err().code,
+            PathGuard::validate_safe_filename("../escape.md", &["md"])
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidFileName
         );
         assert_eq!(
-            PathGuard::validate_safe_filename("sub/file.md", &["md"]).unwrap_err().code,
+            PathGuard::validate_safe_filename("sub/file.md", &["md"])
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidFileName
         );
         assert_eq!(
-            PathGuard::validate_safe_filename("sub\\file.md", &["md"]).unwrap_err().code,
+            PathGuard::validate_safe_filename("sub\\file.md", &["md"])
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidFileName
         );
         assert_eq!(
-            PathGuard::validate_safe_filename("executable.exe", &["md", "json"]).unwrap_err().code,
+            PathGuard::validate_safe_filename("executable.exe", &["md", "json"])
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidFileName
         );
         assert_eq!(
-            PathGuard::validate_safe_filename("no_extension", &["md"]).unwrap_err().code,
+            PathGuard::validate_safe_filename("no_extension", &["md"])
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidFileName
         );
     }
 
     #[test]
     fn rejects_non_existent_vault() {
-        let non_existent = std::env::temp_dir().join(format!("nfdesk_non_existent_{}", Uuid::new_v4()));
+        let non_existent =
+            std::env::temp_dir().join(format!("nfdesk_non_existent_{}", Uuid::new_v4()));
         let err = PathGuard::new(&non_existent).unwrap_err();
         assert_eq!(err.code, ErrorCode::VaultNotAccessible);
     }
@@ -287,13 +310,21 @@ mod tests {
         {
             // Try creating a directory junction using cmd /c mklink /J
             let status = std::process::Command::new("cmd")
-                .args(["/C", "mklink", "/J", &link_dir.to_string_lossy(), &outside.path().to_string_lossy()])
+                .args([
+                    "/C",
+                    "mklink",
+                    "/J",
+                    &link_dir.to_string_lossy(),
+                    &outside.path().to_string_lossy(),
+                ])
                 .output();
 
             match status {
                 Ok(output) if output.status.success() => {
                     let guard = PathGuard::new(vault.path()).unwrap();
-                    let err = guard.resolve_relative(Path::new("linked_outside/outside.md")).unwrap_err();
+                    let err = guard
+                        .resolve_relative(Path::new("linked_outside/outside.md"))
+                        .unwrap_err();
                     assert_eq!(err.code, ErrorCode::PathOutsideVault);
                 }
                 _ => {
@@ -306,7 +337,9 @@ mod tests {
         {
             if std::os::unix::fs::symlink(outside.path(), &link_dir).is_ok() {
                 let guard = PathGuard::new(vault.path()).unwrap();
-                let err = guard.resolve_relative(Path::new("linked_outside/outside.md")).unwrap_err();
+                let err = guard
+                    .resolve_relative(Path::new("linked_outside/outside.md"))
+                    .unwrap_err();
                 assert_eq!(err.code, ErrorCode::PathOutsideVault);
             }
         }

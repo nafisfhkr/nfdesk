@@ -9,6 +9,8 @@ pub enum ErrorCode {
     InvalidFileName,
     VaultSetupFailed,
     ManifestInvalid,
+    TaskFileInvalid,
+    DuplicateTaskId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -49,6 +51,14 @@ impl AppError {
 
     pub fn manifest_invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::ManifestInvalid, message, true)
+    }
+
+    pub fn task_file_invalid(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::TaskFileInvalid, message, true)
+    }
+
+    pub fn duplicate_task_id(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::DuplicateTaskId, message, false)
     }
 }
 
