@@ -85,23 +85,23 @@ export async function updateTask(
   patch: TaskPatch
 ): Promise<Task> {
   return invoke<Task>('task_update', {
-    task_id: taskId,
-    planned_date: plannedDate,
+    taskId,
+    plannedDate,
     patch,
   });
 }
 
 export async function completeTask(taskId: string, plannedDate: string): Promise<Task> {
   return invoke<Task>('task_complete', {
-    task_id: taskId,
-    planned_date: plannedDate,
+    taskId,
+    plannedDate,
   });
 }
 
 export async function cancelTask(taskId: string, plannedDate: string): Promise<Task> {
   return invoke<Task>('task_cancel', {
-    task_id: taskId,
-    planned_date: plannedDate,
+    taskId,
+    plannedDate,
   });
 }
 
@@ -111,16 +111,16 @@ export async function rescheduleTask(
   targetDate: string
 ): Promise<Task> {
   return invoke<Task>('task_reschedule', {
-    task_id: taskId,
-    source_date: sourceDate,
-    target_date: targetDate,
+    taskId,
+    sourceDate,
+    targetDate,
   });
 }
 
 export async function carryTaskToToday(taskId: string, sourceDate: string): Promise<Task> {
   return invoke<Task>('task_carry_to_today', {
-    task_id: taskId,
-    source_date: sourceDate,
+    taskId,
+    sourceDate,
   });
 }
 

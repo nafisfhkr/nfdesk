@@ -1,37 +1,59 @@
 import { useState, useEffect } from 'react';
-import { X, Minus, Pin, Play, Pause, Square, RotateCcw, Coffee, Brain, Clock, CheckSquare, Edit3, Settings } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { X, Minus, Pin, Clock, CalendarDays, Edit3, Settings, Maximize2, Minimize2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
-import { useTimer, formatTime, getDurationMin, getDurationMs, DURATION_KEYS } from './hooks/useTimer';
-import {
-  appendDailyNote,
-  timeStamp,
-} from './lib/markdown';
-import TasksView from './components/TasksView';
+import { useTimer, getDurationMin, DURATION_KEYS } from './hooks/useTimer';
+import { appendDailyNote, timeStamp } from './lib/markdown';
+import PlannerView, { type PlannerFocusTask } from './features/planner/PlannerView';
+import FocusTimerView from './features/timer/FocusTimerView';
 import NoteView from './components/NoteView';
 import VaultSetup from './components/VaultSetup';
 import { notifyTimerCompletion } from './lib/notifications';
 
+type ActiveView = 'PLANNER' | 'TIMER' | 'NOTE';
+
 function App() {
   const [time, setTime] = useState<string>('');
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [task, setTask] = useState('');
-  const [activeTab, setActiveTab] = useState<'TIMER' | 'TASKS' | 'NOTE'>('TIMER');
+  const [activeView, setActiveView] = useState<ActiveView>('PLANNER');
+  const [focusTask, setFocusTask] = useState<PlannerFocusTask | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [logStatus, setLogStatus] = useState<'IDLE' | 'SAVING' | 'DONE' | 'ERROR'>('IDLE');
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [focusMinutes, setFocusMinutes] = useState(() => getDurationMin('FOCUS'));
   const [breakMinutes, setBreakMinutes] = useState(() => getDurationMin('BREAK'));
 
-  const { mode, status, remaining, start, pause, resume, reset, switchMode, startedAt } = useTimer();
-  const isRunning = status === 'RUNNING';
-  const isFocusCompleted = status === 'COMPLETED' && mode === 'FOCUS';
+  const timer = useTimer();
+  const { mode, status, start, pause, resume } = timer;
 
   useEffect(() => {
     isEnabled().then(setAutoStartEnabled).catch(() => setAutoStartEnabled(false));
   }, []);
 
-  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer, 1/2/3 switches tabs
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    const initWindow = async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+        setIsMaximized(await win.isMaximized());
+        unlisten = await win.onResized(async () => {
+          try {
+            setIsMaximized(await win.isMaximized());
+          } catch {}
+        });
+      } catch {}
+    };
+    initWindow();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  // Global keyboard shortcuts: Esc closes Settings, Space toggles timer, 1/2/3 switches views.
+  // Must not interfere with typing in inputs.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -46,30 +68,30 @@ function App() {
       const isTyping =
         target?.tagName === 'INPUT' ||
         target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
         target?.isContentEditable;
 
-      // Tab switching shortcuts: 1 (Timer), 2 (Tasks), 3 (Note) or Ctrl+1, Ctrl+2, Ctrl+3
+      if (isTyping) return;
+
       if (!showSettings) {
-        if (!isTyping || e.ctrlKey) {
-          if (e.key === '1') {
-            e.preventDefault();
-            setActiveTab('TIMER');
-            return;
-          }
-          if (e.key === '2') {
-            e.preventDefault();
-            setActiveTab('TASKS');
-            return;
-          }
-          if (e.key === '3') {
-            e.preventDefault();
-            setActiveTab('NOTE');
-            return;
-          }
+        if (e.key === '1') {
+          e.preventDefault();
+          setActiveView('PLANNER');
+          return;
+        }
+        if (e.key === '2') {
+          e.preventDefault();
+          setActiveView('TIMER');
+          return;
+        }
+        if (e.key === '3') {
+          e.preventDefault();
+          setActiveView('NOTE');
+          return;
         }
       }
 
-      if (e.key === ' ' && !isTyping && activeTab === 'TIMER') {
+      if (e.key === ' ' && activeView === 'TIMER') {
         e.preventDefault();
         if (status === 'IDLE') start();
         else if (status === 'RUNNING') pause();
@@ -79,7 +101,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSettings, activeTab, status, start, pause, resume]);
+  }, [showSettings, activeView, status, start, pause, resume]);
 
   const toggleAutoStart = async () => {
     if (autoStartEnabled) {
@@ -94,7 +116,7 @@ function App() {
   const saveSettings = () => {
     localStorage.setItem(DURATION_KEYS.FOCUS, focusMinutes.toString());
     localStorage.setItem(DURATION_KEYS.BREAK, breakMinutes.toString());
-    reset();
+    timer.reset();
     setShowSettings(false);
   };
 
@@ -126,12 +148,29 @@ function App() {
     }
   };
 
+  const handleToggleMaximize = async () => {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      const isMax = await win.isMaximized();
+      if (isMax) {
+        await win.unmaximize();
+        setIsMaximized(false);
+      } else {
+        await win.maximize();
+        setIsMaximized(true);
+      }
+    } catch (err) {
+      console.error('Failed to toggle maximize:', err);
+    }
+  };
+
   const saveFocusLog = async () => {
     setLogStatus('SAVING');
     try {
       const end = new Date();
-      const start = startedAt ? new Date(startedAt) : end;
-      await appendDailyNote(`- **${timeStamp(start)}–${timeStamp(end)}** — ${task || 'Focus session'}`);
+      const startDate = timer.startedAt ? new Date(timer.startedAt) : end;
+      await appendDailyNote(`- **${timeStamp(startDate)}–${timeStamp(end)}** — ${task || 'Focus session'}`);
       setLogStatus('DONE');
     } catch (e) {
       console.error(e);
@@ -149,7 +188,7 @@ function App() {
     if (status === 'COMPLETED') {
       notifyTimerCompletion(mode, task);
     }
-  }, [status, mode]);
+  }, [status, mode, task]);
 
   const toggleAlwaysOnTop = async () => {
     try {
@@ -163,35 +202,33 @@ function App() {
     }
   };
 
-  const handleFocusTask = (taskTitle: string) => {
-    const cleanTitle = taskTitle.replace(/^\[.*?\]\s*/, '').trim();
-    setTask(cleanTitle || taskTitle);
-    setActiveTab('TIMER');
-    if (status === 'IDLE') {
-      start();
-    }
+  const handlePlannerStartFocus = (selected: PlannerFocusTask) => {
+    setFocusTask(selected);
+    setTask(selected.title);
+    setActiveView('TIMER');
+    if (status === 'IDLE') start();
   };
 
-  return (
-    <div className="flex flex-col w-screen h-screen bg-transparent p-3 select-none overflow-hidden font-sans">
-      {/* Outer Glow & Glassmorphism Container */}
-      <div className="relative flex-1 rounded-2xl glass-panel flex flex-col overflow-hidden border border-slate-700/50 shadow-2xl transition-all duration-300">
+  void focusTask;
 
-        {/* Subtle Ambient Top Glow */}
-        <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+  return (
+    <div className={`flex flex-col w-screen h-screen bg-transparent ${isMaximized ? 'p-1' : 'p-3'} select-none overflow-hidden font-sans transition-all duration-200`}>
+      {/* Outer Glow & Glassmorphism Container */}
+      <div className={`relative flex-1 ${isMaximized ? 'rounded-xl' : 'rounded-2xl'} glass-panel flex flex-col overflow-hidden border ${isMaximized ? 'border-stone-800/40' : 'border-stone-800/80'} shadow-2xl transition-all duration-300`}>
+        {/* Subtle Ambient Glows - Warm paper / desk lighting */}
+        <div className="absolute -top-16 -left-16 w-48 h-48 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-stone-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Drag Region Header */}
         <div
           data-tauri-drag-region
-          className="h-11 glass-header flex items-center justify-between px-3 cursor-grab active:cursor-grabbing border-b border-white/10 z-20"
+          onDoubleClick={handleToggleMaximize}
+          className="h-11 glass-header flex items-center justify-between px-3 cursor-grab active:cursor-grabbing border-b border-stone-800/80 z-20"
         >
           {/* Brand & App Name */}
           <div className="flex items-center gap-2 pointer-events-none">
-            <span className="text-xs font-bold tracking-wide text-slate-100 drop-shadow-sm">
-              NFDesk
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+            <span className="text-xs font-bold tracking-wide text-stone-200 drop-shadow-sm">NFDesk</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-800 text-stone-300 font-semibold border border-stone-700">
               FOCUS
             </span>
           </div>
@@ -200,11 +237,11 @@ function App() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={toggleAlwaysOnTop}
-              title={isAlwaysOnTop ? "Always on top (Active)" : "Pin on top"}
+              title={isAlwaysOnTop ? 'Always on top (Active)' : 'Pin on top'}
               className={`p-1 rounded-md transition-all duration-200 ${
                 isAlwaysOnTop
-                  ? 'text-indigo-400 bg-indigo-500/20 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/10'
+                  ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
               }`}
             >
               <Pin className="w-3.5 h-3.5" />
@@ -213,7 +250,7 @@ function App() {
             <button
               onClick={() => setShowSettings(true)}
               title="Settings"
-              className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all duration-200"
+              className="p-1 rounded-md text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-all duration-200"
             >
               <Settings className="w-3.5 h-3.5" />
             </button>
@@ -221,15 +258,23 @@ function App() {
             <button
               onClick={handleMinimize}
               title="Minimize"
-              className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all duration-200"
+              className="p-1 rounded-md text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-all duration-200"
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
 
             <button
+              onClick={handleToggleMaximize}
+              title={isMaximized ? 'Restore size' : 'Maximize'}
+              className="p-1 rounded-md text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-all duration-200"
+            >
+              {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
               onClick={handleClose}
               title="Close"
-              className="p-1 rounded-md text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all duration-200"
+              className="p-1 rounded-md text-stone-400 hover:text-rose-400 hover:bg-rose-500/20 transition-all duration-200"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -238,193 +283,32 @@ function App() {
 
         {/* App Content Body */}
         <div className="flex-1 p-4 flex flex-col justify-between z-10 overflow-hidden relative">
-          
           <AnimatePresence mode="wait">
-            {activeTab === 'TIMER' && (
+            {activeView === 'PLANNER' && (
               <motion.div
-                key="timer"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.15 }}
-                className="flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar pr-1"
-              >
-                {/* Top Info Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <span className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-rose-400 animate-ping' : 'bg-emerald-400'}`} />
-                    <span>{isRunning ? 'Focusing' : status === 'PAUSED' ? 'Paused' : 'Ready'}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
-                    <span>{time || '--:--:--'}</span>
-                  </div>
-                </div>
-
-                {/* Mode Toggle */}
-                <div className="flex items-center justify-center mt-2">
-                  <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
-                    <button
-                      onClick={() => switchMode('FOCUS')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                        mode === 'FOCUS'
-                          ? 'bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <Brain className="w-3.5 h-3.5" />
-                      Focus
-                      <span className="opacity-70 text-[10px]">{getDurationMin('FOCUS')}m</span>
-                    </button>
-                    <button
-                      onClick={() => switchMode('BREAK')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                        mode === 'BREAK'
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/25'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <Coffee className="w-3.5 h-3.5" />
-                      Break
-                      <span className="opacity-70 text-[10px]">{getDurationMin('BREAK')}m</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Current Task Input */}
-                <div className="relative mt-2">
-                  <input
-                    type="text"
-                    value={task}
-                    onChange={(e) => setTask(e.target.value)}
-                    placeholder={isRunning ? task || 'Focusing…' : "What are you focusing on?"}
-                    readOnly={isRunning}
-                    disabled={isRunning}
-                    className={`w-full text-center text-sm py-2.5 bg-transparent outline-none border-b transition-all duration-300 placeholder:text-slate-500 ${
-                      isRunning
-                        ? 'text-slate-200 font-semibold border-indigo-500/40 focus:border-indigo-400'
-                        : 'text-slate-100 border-white/10 hover:border-white/20 focus:border-indigo-400 focus:glow-indigo'
-                    }`}
-                  />
-                </div>
-
-                {/* Timer Display */}
-                <div className="my-auto py-4 flex flex-col items-center justify-center">
-                  <div className={`relative flex items-center justify-center ${
-                    isRunning ? 'animate-glow-pulse' : ''
-                  }`}>
-                    {/* Circular Progress Ring */}
-                    <svg className="absolute w-52 h-52 -rotate-90" viewBox="0 0 200 200">
-                      <defs>
-                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor={mode === 'BREAK' ? '#34d399' : '#6366f1'} />
-                          <stop offset="100%" stopColor={mode === 'BREAK' ? '#2dd4bf' : '#8b5cf6'} />
-                        </linearGradient>
-                      </defs>
-                      <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-                      <circle
-                        cx="100" cy="100" r="88" fill="none"
-                        stroke="url(#ringGrad)" strokeWidth="6" strokeLinecap="round"
-                        strokeDasharray={2 * Math.PI * 88}
-                        strokeDashoffset={2 * Math.PI * 88 * (1 - remaining / getDurationMs(mode))}
-                        className="transition-[stroke-dashoffset] duration-300 ease-linear"
-                      />
-                    </svg>
-
-                    <div className="w-44 h-44 rounded-full flex flex-col items-center justify-center glass-card">
-                      <span className={`font-bold tabular-nums tracking-tight ${isRunning ? 'animate-pulse-subtle' : ''}`}
-                            style={{ fontSize: remaining >= 10 * 60 * 1000 ? '3.4rem' : '3.1rem' }}>
-                        {formatTime(remaining)}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-1">
-                        {mode === 'BREAK' ? 'Break' : 'Focus'} session
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Controls */}
-                  <div className="flex items-center gap-3 mt-6">
-                    {status === 'IDLE' && (
-                      <button
-                        onClick={start}
-                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                      >
-                        <Play className="w-4 h-4 fill-current" />
-                        Start Focus
-                      </button>
-                    )}
-
-                    {isRunning && (
-                      <button
-                        onClick={pause}
-                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white/10 text-slate-100 text-sm font-bold border border-white/10 hover:bg-white/15 active:scale-95 transition-all duration-200"
-                      >
-                        <Pause className="w-4 h-4 fill-current" />
-                        Pause
-                      </button>
-                    )}
-
-                    {status === 'PAUSED' && (
-                      <>
-                        <button
-                          onClick={resume}
-                          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                        >
-                          <Play className="w-4 h-4 fill-current" />
-                          Resume
-                        </button>
-                        <button
-                          onClick={reset}
-                          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 text-slate-400 text-sm font-bold border border-white/10 hover:text-rose-400 hover:border-rose-500/30 active:scale-95 transition-all duration-200"
-                        >
-                          <Square className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
-
-                    {isFocusCompleted && (
-                      <button
-                        onClick={saveFocusLog}
-                        disabled={logStatus === 'SAVING'}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border transition-all duration-200 ${
-                          logStatus === 'DONE'
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                            : logStatus === 'ERROR'
-                            ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
-                            : 'bg-white/10 text-slate-100 border-white/10 hover:bg-white/15 active:scale-95'
-                        }`}
-                      >
-                        {logStatus === 'DONE' ? '✓ Logged!' : logStatus === 'ERROR' ? 'Error!' : '💾 Save Log to Obsidian'}
-                      </button>
-                    )}
-
-                    {status === 'COMPLETED' && (
-                      <button
-                        onClick={reset}
-                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-95 transition-all duration-200"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Restart
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {activeTab === 'TASKS' && (
-              <motion.div
-                key="tasks"
+                key="planner"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.15 }}
                 className="flex-1 w-full h-full"
               >
-                <TasksView onFocusTask={handleFocusTask} />
+                <PlannerView onStartFocus={handlePlannerStartFocus} />
               </motion.div>
             )}
 
-            {activeTab === 'NOTE' && (
+            {activeView === 'TIMER' && (
+              <FocusTimerView
+                timer={timer}
+                currentTime={time}
+                taskTitle={task}
+                onTaskTitleChange={setTask}
+                logStatus={logStatus}
+                onSaveFocusLog={saveFocusLog}
+              />
+            )}
+
+            {activeView === 'NOTE' && (
               <motion.div
                 key="note"
                 initial={{ opacity: 0, x: -10 }}
@@ -439,47 +323,52 @@ function App() {
           </AnimatePresence>
 
           {/* Bottom Navigation Bar */}
-          <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 mb-4 mt-2">
+          <div className="flex bg-stone-900/80 p-1 rounded-xl border border-stone-800/80 mb-2 mt-2">
             <button
-              onClick={() => setActiveTab('TIMER')}
+              onClick={() => setActiveView('PLANNER')}
               className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'TIMER'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                activeView === 'PLANNER'
+                  ? 'bg-stone-800 text-stone-100 border border-stone-700 shadow-sm'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
+              <CalendarDays className="w-3.5 h-3.5 text-stone-300" />
+              <span>Planner</span>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-stone-700/60 rounded text-stone-400">
+                1
+              </kbd>
+            </button>
+
+            <button
+              onClick={() => setActiveView('TIMER')}
+              className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                activeView === 'TIMER'
+                  ? 'bg-stone-800 text-stone-100 border border-stone-700 shadow-sm'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-stone-300" />
               <span>Timer</span>
-              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">1</kbd>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-stone-700/60 rounded text-stone-400">
+                2
+              </kbd>
             </button>
 
             <button
-              onClick={() => setActiveTab('TASKS')}
+              onClick={() => setActiveView('NOTE')}
               className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'TASKS'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                activeView === 'NOTE'
+                  ? 'bg-stone-800 text-stone-100 border border-stone-700 shadow-sm'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
               }`}
             >
-              <CheckSquare className="w-3.5 h-3.5" />
-              <span>Tasks</span>
-              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">2</kbd>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('NOTE')}
-              className={`group flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'NOTE'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Edit3 className="w-3.5 h-3.5 text-stone-300" />
               <span>Note</span>
-              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-white/10 rounded text-slate-400">3</kbd>
+              <kbd className="hidden group-hover:inline text-[9px] font-mono px-1 py-0.5 bg-stone-700/60 rounded text-stone-400">
+                3
+              </kbd>
             </button>
           </div>
-
         </div>
       </div>
 
@@ -490,7 +379,7 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setShowSettings(false)}
           >
             <motion.div
@@ -499,16 +388,16 @@ function App() {
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-panel w-full max-w-sm rounded-2xl border border-white/10 p-5 shadow-2xl"
+              className="glass-panel w-full max-w-sm rounded-2xl border border-stone-800 p-5 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-sm font-bold text-stone-100 flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-amber-400" />
                   Settings
                 </h2>
                 <button
                   onClick={() => setShowSettings(false)}
-                  className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-white/10 transition-all"
+                  className="p-1 rounded-md text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-all"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -520,7 +409,7 @@ function App() {
 
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="min-w-0">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate">
+                  <label className="block text-[11px] uppercase tracking-wider text-stone-400 mb-1.5 truncate">
                     Focus (min)
                   </label>
                   <input
@@ -529,11 +418,11 @@ function App() {
                     value={focusMinutes}
                     onChange={(e) => setFocusMinutes(Number(e.target.value))}
                     placeholder="25"
-                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-stone-700/80 text-stone-100 outline-none placeholder:text-stone-500 focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/20 transition-all"
                   />
                 </div>
                 <div className="min-w-0">
-                  <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 truncate">
+                  <label className="block text-[11px] uppercase tracking-wider text-stone-400 mb-1.5 truncate">
                     Break (min)
                   </label>
                   <input
@@ -542,22 +431,22 @@ function App() {
                     value={breakMinutes}
                     onChange={(e) => setBreakMinutes(Number(e.target.value))}
                     placeholder="5"
-                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:glow-indigo transition-all"
+                    className="w-full text-sm py-2.5 px-3 rounded-xl bg-white/5 border border-stone-700/80 text-stone-100 outline-none placeholder:text-stone-500 focus:border-amber-400/80 focus:ring-1 focus:ring-amber-400/20 transition-all"
                   />
                 </div>
               </div>
 
               <button
                 onClick={toggleAutoStart}
-                className="flex items-center justify-between w-full mt-4 py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                className="flex items-center justify-between w-full mt-4 py-2.5 px-3 rounded-xl bg-white/5 border border-stone-700/80 hover:bg-white/10 transition-all"
               >
-                <span className="flex items-center gap-2 text-sm text-slate-200">
-                  <span className={`w-2 h-2 rounded-full ${autoStartEnabled ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                <span className="flex items-center gap-2 text-sm text-stone-200">
+                  <span className={`w-2 h-2 rounded-full ${autoStartEnabled ? 'bg-emerald-400' : 'bg-stone-500'}`} />
                   Launch at startup
                 </span>
                 <span
                   className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
-                    autoStartEnabled ? 'bg-indigo-500' : 'bg-white/15'
+                    autoStartEnabled ? 'bg-amber-600' : 'bg-white/15'
                   }`}
                 >
                   <span
@@ -569,17 +458,17 @@ function App() {
               </button>
 
               <div className="flex justify-between items-center gap-2 mt-4">
-                <span className="text-[11px] text-slate-500 font-mono">v0.1.2</span>
+                <span className="text-[11px] text-stone-500 font-mono">v0.1.4</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowSettings(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 border border-white/10 hover:bg-white/5 transition-all"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-stone-400 border border-stone-700/80 hover:bg-stone-800/60 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={saveSettings}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-500 text-white shadow-md shadow-indigo-500/25 hover:brightness-110 active:scale-95 transition-all"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-stone-800 hover:bg-stone-700 text-stone-100 border border-stone-700 hover:border-stone-600 shadow-md active:scale-95 transition-all"
                   >
                     Save
                   </button>

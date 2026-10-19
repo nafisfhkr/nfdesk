@@ -86,7 +86,7 @@ export default function NoteView() {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${
             note.trim() === ''
               ? 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
-              : 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500 hover:text-white hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95'
+              : 'bg-stone-800 text-stone-100 border border-stone-700 hover:bg-stone-700 hover:text-amber-200 hover:border-stone-600 hover:shadow-lg active:scale-95'
           }`}
         >
           <Save className="w-3.5 h-3.5" />
