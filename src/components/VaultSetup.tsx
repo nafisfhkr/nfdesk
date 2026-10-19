@@ -159,7 +159,7 @@ export default function VaultSetup({ onVaultConfigured }: VaultSetupProps) {
           <button
             onClick={handlePickFolder}
             disabled={state.kind === 'validating' || state.kind === 'setting-up'}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-xs font-semibold text-indigo-200 transition-all active:scale-95 disabled:opacity-50"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 border border-stone-700 text-xs font-semibold text-stone-200 transition-all active:scale-95 disabled:opacity-50"
           >
             <FolderOpen className="w-3.5 h-3.5" />
             {currentVaultPath ? 'Ganti' : 'Pilih Folder'}
@@ -169,7 +169,7 @@ export default function VaultSetup({ onVaultConfigured }: VaultSetupProps) {
 
       {/* Validating indicator */}
       {state.kind === 'validating' && (
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-300 flex items-center gap-2">
+        <div className="p-3 bg-stone-800/60 border border-stone-700 rounded-xl text-xs text-stone-300 flex items-center gap-2">
           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
           <span>Memvalidasi direktori Vault…</span>
         </div>
@@ -193,7 +193,7 @@ export default function VaultSetup({ onVaultConfigured }: VaultSetupProps) {
               Struktur Folder NFDesk
             </span>
             {state.preview.directories_to_create.length > 0 && (
-              <div className="text-indigo-300 text-[11px]">
+              <div className="text-amber-300 text-[11px]">
                 Akan dibuat: {state.preview.directories_to_create.join(', ')}
               </div>
             )}
@@ -229,7 +229,7 @@ export default function VaultSetup({ onVaultConfigured }: VaultSetupProps) {
             </button>
             <button
               onClick={() => handleConfirmSetup(state.selectedPath, state.preview)}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 active:scale-95 transition-all"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-stone-800 hover:bg-stone-700 text-stone-100 border border-stone-700 shadow-md active:scale-95 transition-all"
             >
               Siapkan NFDesk
             </button>
@@ -239,7 +239,7 @@ export default function VaultSetup({ onVaultConfigured }: VaultSetupProps) {
 
       {/* Setting up indicator */}
       {state.kind === 'setting-up' && (
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-300 flex items-center gap-2">
+        <div className="p-3 bg-stone-800/60 border border-stone-700 rounded-xl text-xs text-stone-300 flex items-center gap-2">
           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
           <span>Menyiapkan Vault…</span>
         </div>

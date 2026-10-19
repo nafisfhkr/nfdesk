@@ -18,17 +18,17 @@
   }
 }
 
-/* Glassmorphism & UI Promax Utility Styles */
+/* Glassmorphism & UI Promax Utility Styles - Warm Stone & Desk Palette */
 .glass-panel {
-  background: rgba(15, 17, 23, 0.85);
+  background: rgba(28, 25, 23, 0.94);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .glass-header {
-  background: rgba(22, 25, 35, 0.7);
+  background: rgba(38, 34, 30, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -46,7 +46,7 @@
 }
 
 @layer utilities {
-  .glow-indigo {
-    box-shadow: 0 4px 30px rgba(99, 102, 241, 0.35);
+  .glow-amber {
+    box-shadow: 0 4px 30px rgba(217, 119, 6, 0.25);
   }
 }
